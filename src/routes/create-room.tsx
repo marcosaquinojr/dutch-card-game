@@ -31,7 +31,7 @@ function CreateRoom() {
   const nav = useNavigate();
   const { createRoom, roomState, error } = useRoom();
 
-  const [playerName, setPlayerName] = useState(() => localStorage.getItem("dutch_playerName") || "Jogador 1");
+  const [playerName, setPlayerName] = useState(() => (typeof window !== "undefined" ? localStorage.getItem("dutch_playerName") : null) || "Jogador 1");
   const [name, setName] = useState("Mesa do Dutch");
   const [pwd, setPwd] = useState("");
   const [maxPlayers, setMaxPlayers] = useState(4);
@@ -45,7 +45,9 @@ function CreateRoom() {
 
   useEffect(() => {
     if (roomState?.code) {
-      localStorage.setItem("dutch_playerName", playerName);
+      if (typeof window !== "undefined") {
+        localStorage.setItem("dutch_playerName", playerName);
+      }
       nav({ to: "/lobby", search: { code: roomState.code } });
     }
   }, [roomState, nav, playerName]);

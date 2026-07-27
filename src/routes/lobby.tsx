@@ -30,7 +30,7 @@ function Lobby() {
   const { roomState, error, joinRoom, leaveRoom, setReady, startGame } = useRoom();
   const { messages, sendMessage } = useChat();
 
-  const [playerName, setPlayerName] = useState(() => localStorage.getItem("dutch_playerName") || "");
+  const [playerName, setPlayerName] = useState(() => (typeof window !== "undefined" ? localStorage.getItem("dutch_playerName") : null) || "");
   const [joinCodeInput, setJoinCodeInput] = useState(search.code || "");
   const [draft, setDraft] = useState("");
   const [isJoining, setIsJoining] = useState(false);
@@ -77,7 +77,9 @@ function Lobby() {
       toast.error("Digite o código da sala");
       return;
     }
-    localStorage.setItem("dutch_playerName", playerName);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("dutch_playerName", playerName);
+    }
     setIsJoining(true);
     joinRoom({
       code: joinCodeInput.trim().toUpperCase(),

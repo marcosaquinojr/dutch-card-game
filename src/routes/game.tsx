@@ -71,7 +71,7 @@ function Game() {
     );
   }
 
-  const playerName = localStorage.getItem("dutch_playerName") || "Você";
+  const playerName = (typeof window !== "undefined" ? localStorage.getItem("dutch_playerName") : null) || "Você";
   const me = gameState.players.find((p) => p.name === playerName) || gameState.players[0];
   const isMyTurn = gameState.currentTurnPlayerId === me?.id;
   const activePlayer = gameState.players.find((p) => p.id === gameState.currentTurnPlayerId) || me;
