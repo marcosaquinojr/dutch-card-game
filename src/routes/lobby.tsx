@@ -28,6 +28,7 @@ function Lobby() {
   const nav = useNavigate();
   const search = Route.useSearch();
   const { roomState, error, joinRoom, leaveRoom, setReady, startGame } = useRoom();
+  const { gameState } = useGame();
   const { messages, sendMessage } = useChat();
 
   const [playerName, setPlayerName] = useState(() => (typeof window !== "undefined" ? localStorage.getItem("dutch_playerName") : null) || "");
@@ -37,10 +38,15 @@ function Lobby() {
 
   // Redireciona para o jogo quando a partida inicia
   useEffect(() => {
-    if (roomState?.phase === "memorize" || roomState?.phase === "playing") {
+    if (
+      roomState?.phase === "memorize" ||
+      roomState?.phase === "playing" ||
+      gameState?.phase === "memorize" ||
+      gameState?.phase === "playing"
+    ) {
       nav({ to: "/game" });
     }
-  }, [roomState?.phase, nav]);
+  }, [roomState?.phase, gameState?.phase, nav]);
 
   // Exibe erros via toast
   useEffect(() => {
@@ -160,7 +166,7 @@ function Lobby() {
   const isHost = me?.isHost;
   const isReady = me?.ready;
   const readyCount = roomState.players.filter((p) => p.ready).length;
-  const canStart = isHost && roomState.players.length >= 2 && roomState.players.every((p) => p.ready);
+  const canStart = isHost && roomState.players.length >= 2;
 
   const handleShareLink = () => {
     if (!roomState) return;

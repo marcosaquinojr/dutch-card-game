@@ -122,7 +122,7 @@ export class RoomManager {
       name: playerName,
       avatar,
       isHost: false,
-      ready: false,
+      ready: true,
       connected: true,
       score: 0,
       hand: [],

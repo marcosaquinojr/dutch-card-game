@@ -182,10 +182,13 @@ export function registerSocketHandlers(io: TypedServer): void {
 
     socket.on('game:start', () => {
       const roomData = roomManager.getRoomBySocketId(socket.id);
-      if (!roomData) return;
+      if (!roomData) {
+        socket.emit('error', { message: 'Sua conexão com a sala não foi encontrada. Tente reconectar.' });
+        return;
+      }
       const { room, player } = roomData;
 
-      // Validações: host, mínimo de jogadores, todos prontos
+      // Validações: host e mínimo de 2 jogadores
       if (!player.isHost) {
         socket.emit('error', { message: 'Apenas o host pode iniciar a partida' });
         return;
@@ -194,18 +197,21 @@ export function registerSocketHandlers(io: TypedServer): void {
         socket.emit('error', { message: 'Mínimo de 2 jogadores para iniciar' });
         return;
       }
-      if (!room.players.every((p) => p.ready)) {
-        socket.emit('error', { message: 'Todos os jogadores devem estar prontos' });
-        return;
+
+      // Garante que todos os jogadores estão marcados como prontos no início
+      for (const p of room.players) {
+        p.ready = true;
       }
 
       GameEngine.startRound(room);
+      emitRoomStateToAll(io, room);
       emitGameStateToAll(io, room);
       console.log(`🎮 Partida iniciada na sala ${room.code} — Rodada ${room.round}`);
 
-      // Após fase de memorização, inicia o jogo
+      // Após fase de memorização (5s), inicia o jogo normalmente
       setTimeout(() => {
         GameEngine.endMemorize(room);
+        emitRoomStateToAll(io, room);
         emitGameStateToAll(io, room);
         startTurnTimer(io, room);
       }, 5000);
