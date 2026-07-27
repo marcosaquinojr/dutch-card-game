@@ -14,7 +14,7 @@ interface Props {
   players: Player[];
   yourHand: CardModel[];
   onClose: () => void;
-  onConfirm: () => void;
+  onConfirm: (targetPlayerId?: string, targetCardIndex?: number) => void;
 }
 
 const META: Record<SpecialKind, { title: string; desc: string; Icon: React.ComponentType<{ className?: string }>; color: string }> = {
@@ -105,7 +105,7 @@ export function SpecialCardModal({ open, kind, players, yourHand, onClose, onCon
               </button>
               <motion.button
                 whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
-                onClick={() => { onConfirm(); setPickedCard(null); setPickedPlayer(null); }}
+                onClick={() => { onConfirm(pickedPlayer || undefined, pickedCard ?? undefined); setPickedCard(null); setPickedPlayer(null); }}
                 className={cn("rounded-full px-6 py-2.5 font-display font-bold text-black glow-neon", M.color)}
               >
                 Confirmar

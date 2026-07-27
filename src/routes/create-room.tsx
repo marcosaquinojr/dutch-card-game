@@ -1,12 +1,14 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { motion } from "framer-motion";
-import { useState } from "react";
-import { ArrowLeft, Sparkles, Users, Clock, Trophy, Lock, Eye } from "lucide-react";
+import { useState, useEffect } from "react";
+import { ArrowLeft, Sparkles, Users, Clock, Trophy, Lock, Eye, User } from "lucide-react";
 import { DutchLogo } from "@/components/dutch/DutchLogo";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import { useRoom } from "@/lib/socket-client";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/create-room")({
   head: () => ({
@@ -27,7 +29,10 @@ const MAX_SCORES = [50, 100, 150, 200];
 
 function CreateRoom() {
   const nav = useNavigate();
-  const [name, setName] = useState("Mesa da Nina");
+  const { createRoom, roomState, error } = useRoom();
+
+  const [playerName, setPlayerName] = useState(() => localStorage.getItem("dutch_playerName") || "Jogador 1");
+  const [name, setName] = useState("Mesa do Dutch");
   const [pwd, setPwd] = useState("");
   const [maxPlayers, setMaxPlayers] = useState(4);
   const [cards, setCards] = useState(4);
@@ -37,6 +42,40 @@ function CreateRoom() {
   const [simDiscard, setSimDiscard] = useState(true);
 
   const visible = cards <= 4 ? 1 : 2;
+
+  useEffect(() => {
+    if (roomState?.code) {
+      localStorage.setItem("dutch_playerName", playerName);
+      nav({ to: "/lobby", search: { code: roomState.code } });
+    }
+  }, [roomState, nav, playerName]);
+
+  useEffect(() => {
+    if (error) {
+      toast.error(error);
+    }
+  }, [error]);
+
+  const handleCreate = () => {
+    if (!playerName.trim()) {
+      toast.error("Digite seu nome");
+      return;
+    }
+    createRoom({
+      playerName: playerName.trim(),
+      avatar: `https://api.dicebear.com/9.x/adventurer/svg?seed=${encodeURIComponent(playerName)}&backgroundColor=1e293b`,
+      roomName: name.trim() || "Mesa do Dutch",
+      password: pwd || undefined,
+      settings: {
+        maxPlayers,
+        cardsPerPlayer: cards,
+        turnTimeSeconds: turn,
+        maxScore,
+        specialCards: special,
+        simultaneousDiscard: simDiscard,
+      },
+    });
+  };
 
   return (
     <main className="relative min-h-screen">
@@ -64,6 +103,10 @@ function CreateRoom() {
           </div>
 
           <div className="grid gap-6 md:grid-cols-2">
+            <Field label="Seu Nome / Nickname" icon={<User className="h-3.5 w-3.5" />} full>
+              <Input value={playerName} onChange={(e) => setPlayerName(e.target.value)} placeholder="Seu nome" className="glass border-white/10 h-11" />
+            </Field>
+
             <Field label="Nome da sala">
               <Input value={name} onChange={(e) => setName(e.target.value)} className="glass border-white/10 h-11" />
             </Field>
@@ -112,7 +155,7 @@ function CreateRoom() {
             <motion.button
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
-              onClick={() => nav({ to: "/lobby" })}
+              onClick={handleCreate}
               className="rounded-full gradient-neon px-8 py-3 font-display font-bold text-black glow-neon"
             >
               Criar Partida
