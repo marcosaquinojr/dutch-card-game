@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: dutch-card-game
+    env: node
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NITRO_PRESET
+        value: node-server
