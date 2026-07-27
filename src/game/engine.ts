@@ -82,14 +82,10 @@ export class GameEngine {
   }
   
   /**
-   * Jogador compra carta do descarte. Retorna a carta.
+   * Cartas descartadas são perdidas — não é possível comprar do descarte.
    */
   static drawFromDiscard(room: GameRoom, playerId: string): CardModel | null {
-    if (!this.isPlayerTurn(room, playerId)) return null;
-    if (room.phase !== 'playing' && room.phase !== 'dutch-called') return null;
-    if (room.discardPile.length === 0) return null;
-    
-    return room.discardPile.pop() || null;
+    return null;
   }
   
   /**

@@ -233,18 +233,7 @@ export function registerSocketHandlers(io: TypedServer): void {
     });
 
     socket.on('game:draw-discard', () => {
-      const roomData = roomManager.getRoomBySocketId(socket.id);
-      if (!roomData) return;
-      const { room, player } = roomData;
-
-      const card = GameEngine.drawFromDiscard(room, player.id);
-      if (!card) {
-        socket.emit('error', { message: 'Não é possível comprar do descarte agora' });
-        return;
-      }
-
-      socket.emit('game:card-drawn', { card, fromDeck: false });
-      emitGameStateToAll(io, room);
+      socket.emit('error', { message: 'Não é possível comprar do descarte nesta regra. Compre apenas do Monte.' });
     });
 
     socket.on('game:discard', (data) => {

@@ -188,11 +188,11 @@ function Game() {
           </div>
         ))}
 
-        {/* Centro: Monte de Compras + Descarte */}
+        {/* Centro: Monte de Compras + Descarte (Cartas descartadas são perdidas) */}
         <div className="absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2">
           <div className="flex items-end gap-8 rounded-3xl glass-strong px-8 py-6">
             <Deck count={gameState.deckCount} onClick={handleDrawDeck} />
-            <DiscardPile top={gameState.discardTop || { id: "top", value: "K", suit: "♠", points: 0 }} onClick={handleDrawDiscard} />
+            <DiscardPile top={gameState.discardTop || { id: "top", value: "K", suit: "♠", points: 0 }} />
           </div>
         </div>
 
@@ -269,7 +269,6 @@ function Game() {
 
           <div className="flex flex-wrap items-center justify-center gap-2">
             <ActionButton onClick={handleDrawDeck} label="Comprar Monte" tone="neon" />
-            <ActionButton onClick={handleDrawDiscard} label="Comprar Descarte" tone="ghost" />
             <ActionButton onClick={() => setModalKind("peek")} label="Olhar" Icon={Eye} tone="ghost" />
             <ActionButton onClick={() => setModalKind("swap")} label="Trocar" Icon={Repeat2} tone="ghost" />
             <ActionButton onClick={() => setModalKind("reveal")} label="Revelar" Icon={Sparkles} tone="ghost" />
