@@ -50,6 +50,12 @@ function Lobby() {
     }
   }, [error]);
 
+  useEffect(() => {
+    if (roomState) {
+      setIsJoining(false);
+    }
+  }, [roomState]);
+
   // Se já há um código no URL e não estamos na sala, tentar entrar
   useEffect(() => {
     if (search.code && !roomState && playerName) {

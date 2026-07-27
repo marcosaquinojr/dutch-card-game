@@ -94,10 +94,19 @@ export class RoomManager {
   ): GameRoom | { error: string } {
     const room = this.rooms.get(code);
     if (!room) return { error: 'Sala não encontrada' };
+
+    // Se o jogador já está na sala (reconexão ou refresh), apenas atualiza o socketId e retorna
+    const existingPlayer = room.players.find((p) => p.id === playerId || p.socketId === socketId);
+    if (existingPlayer) {
+      existingPlayer.socketId = socketId;
+      existingPlayer.name = playerName || existingPlayer.name;
+      existingPlayer.connected = true;
+      return room;
+    }
+
     if (room.phase !== 'lobby') return { error: 'O jogo já começou' };
     if (room.players.length >= room.settings.maxPlayers) return { error: 'Sala cheia' };
     if (room.password && room.password !== password) return { error: 'Senha incorreta' };
-    if (room.players.some((p) => p.id === playerId)) return { error: 'Jogador já está na sala' };
 
     const player: ServerPlayer = {
       id: playerId,
