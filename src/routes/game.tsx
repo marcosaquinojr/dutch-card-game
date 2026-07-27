@@ -6,6 +6,7 @@ import { DutchLogo } from "@/components/dutch/DutchLogo";
 import { PlayerAvatar } from "@/components/dutch/PlayerAvatar";
 import { PlayerHand } from "@/components/dutch/PlayerHand";
 import { Deck, DiscardPile } from "@/components/dutch/Deck";
+import { PlayingCard } from "@/components/dutch/PlayingCard";
 import { TurnIndicator } from "@/components/dutch/TurnIndicator";
 import { SpecialCardModal, type SpecialKind } from "@/components/dutch/SpecialCardModal";
 import { useGame, useRoom } from "@/lib/socket-client";
