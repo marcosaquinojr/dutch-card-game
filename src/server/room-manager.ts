@@ -83,6 +83,13 @@ export class RoomManager {
     return room;
   }
 
+  /** Helper: normaliza o código da sala (adiciona prefixo DUTCH- se necessário e converte para maiúsculo) */
+  private normalizeCode(code: string): string {
+    if (!code) return '';
+    const clean = code.trim().toUpperCase();
+    return clean.startsWith('DUTCH-') ? clean : `DUTCH-${clean}`;
+  }
+
   /** Adiciona jogador a uma sala */
   joinRoom(
     code: string,
@@ -92,7 +99,8 @@ export class RoomManager {
     avatar: string,
     password?: string,
   ): GameRoom | { error: string } {
-    const room = this.rooms.get(code);
+    const normalizedCode = this.normalizeCode(code);
+    const room = this.rooms.get(normalizedCode) || this.rooms.get(code);
     if (!room) return { error: 'Sala não encontrada' };
 
     // Se o jogador já está na sala (reconexão ou refresh), apenas atualiza o socketId e retorna
@@ -127,7 +135,8 @@ export class RoomManager {
 
   /** Remove jogador de uma sala. Transfere host se necessário. */
   leaveRoom(code: string, playerId: string): { room: GameRoom | null; deleted: boolean } {
-    const room = this.rooms.get(code);
+    const normalizedCode = this.normalizeCode(code);
+    const room = this.rooms.get(normalizedCode) || this.rooms.get(code);
     if (!room) return { room: null, deleted: false };
 
     const playerIndex = room.players.findIndex((p) => p.id === playerId);
@@ -136,7 +145,7 @@ export class RoomManager {
       room.players.splice(playerIndex, 1);
 
       if (room.players.length === 0) {
-        this.rooms.delete(code);
+        this.rooms.delete(room.code);
         return { room: null, deleted: true };
       }
 
@@ -152,7 +161,8 @@ export class RoomManager {
 
   /** Atualiza status de pronto */
   setReady(code: string, playerId: string, ready: boolean): GameRoom | null {
-    const room = this.rooms.get(code);
+    const normalizedCode = this.normalizeCode(code);
+    const room = this.rooms.get(normalizedCode) || this.rooms.get(code);
     if (!room) return null;
 
     const player = room.players.find((p) => p.id === playerId);
@@ -165,7 +175,8 @@ export class RoomManager {
 
   /** Busca sala por código */
   getRoom(code: string): GameRoom | null {
-    return this.rooms.get(code) || null;
+    const normalizedCode = this.normalizeCode(code);
+    return this.rooms.get(normalizedCode) || this.rooms.get(code) || null;
   }
 
   /** Busca sala pelo ID do socket */

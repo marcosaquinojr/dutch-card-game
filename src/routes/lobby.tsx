@@ -77,12 +77,16 @@ function Lobby() {
       toast.error("Digite o código da sala");
       return;
     }
+    let code = joinCodeInput.trim().toUpperCase();
+    if (!code.startsWith("DUTCH-")) {
+      code = `DUTCH-${code}`;
+    }
     if (typeof window !== "undefined") {
       localStorage.setItem("dutch_playerName", playerName);
     }
     setIsJoining(true);
     joinRoom({
-      code: joinCodeInput.trim().toUpperCase(),
+      code,
       playerName: playerName.trim(),
       avatar: `https://api.dicebear.com/9.x/adventurer/svg?seed=${encodeURIComponent(playerName.trim())}&backgroundColor=1e293b`,
     });
