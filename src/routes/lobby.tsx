@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect } from "react";
-import { ArrowLeft, Copy, MessageSquare, Play, Send, User } from "lucide-react";
+import { ArrowLeft, Copy, MessageSquare, Play, Send, User, Share2 } from "lucide-react";
 import { DutchLogo } from "@/components/dutch/DutchLogo";
 import { PlayerAvatar } from "@/components/dutch/PlayerAvatar";
 import { Input } from "@/components/ui/input";
@@ -162,6 +162,24 @@ function Lobby() {
   const readyCount = roomState.players.filter((p) => p.ready).length;
   const canStart = isHost && roomState.players.length >= 2 && roomState.players.every((p) => p.ready);
 
+  const handleShareLink = () => {
+    if (!roomState) return;
+    const url = `${window.location.origin}/lobby?code=${roomState.code}`;
+    if (navigator.share) {
+      navigator.share({
+        title: `DUTCH — ${roomState.name}`,
+        text: `Entra na minha sala do DUTCH! Código: ${roomState.code}`,
+        url,
+      }).catch(() => {
+        navigator.clipboard?.writeText(url);
+        toast.success("Link da sala copiado!");
+      });
+    } else {
+      navigator.clipboard?.writeText(url);
+      toast.success("Link da sala copiado! Envie para seus amigos.");
+    }
+  };
+
   return (
     <main className="relative min-h-screen">
       <div className="mx-auto max-w-6xl px-4 py-8">
@@ -187,12 +205,21 @@ function Lobby() {
                   {roomState.settings.maxPlayers} jogadores max · {roomState.settings.cardsPerPlayer} cartas · {roomState.settings.turnTimeSeconds}s por turno · até {roomState.settings.maxScore} pts
                 </div>
               </div>
-              <button
-                onClick={() => { navigator.clipboard?.writeText(roomState.code); toast.success("Código copiado!"); }}
-                className="shrink-0 flex items-center gap-2 rounded-full glass border border-white/15 px-4 py-2 text-sm font-semibold hover:bg-white/10"
-              >
-                <Copy className="h-3.5 w-3.5" /> {roomState.code}
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleShareLink}
+                  className="shrink-0 flex items-center gap-2 rounded-full gradient-neon px-4 py-2 text-sm font-bold text-black glow-neon"
+                >
+                  <Share2 className="h-3.5 w-3.5" /> Compartilhar Link
+                </button>
+                <button
+                  onClick={() => { navigator.clipboard?.writeText(roomState.code); toast.success("Código copiado!"); }}
+                  className="shrink-0 flex items-center gap-2 rounded-full glass border border-white/15 px-3.5 py-2 text-xs font-semibold hover:bg-white/10 text-white/80"
+                  title="Copiar apenas o código"
+                >
+                  <Copy className="h-3.5 w-3.5" /> {roomState.code}
+                </button>
+              </div>
             </div>
 
             <div className="mt-8">
