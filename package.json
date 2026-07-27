@@ -7,7 +7,7 @@
     "dev": "vite dev",
     "build": "NITRO_PRESET=node-server vite build",
     "build:dev": "vite build --mode development",
-    "start": "node .output/server/index.mjs",
+    "start": "npx tsx prod-server.ts",
     "preview": "vite preview",
     "lint": "eslint .",
     "format": "prettier --write ."

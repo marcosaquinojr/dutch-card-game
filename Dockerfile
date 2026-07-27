@@ -16,12 +16,12 @@ ENV NODE_ENV=production
 ENV PORT=3000
 
 COPY package*.json ./
-RUN npm ci --only=production
+RUN npm ci
 
 COPY --from=builder /app/.output ./.output
-COPY --from=builder /app/server ./server
+COPY --from=builder /app/prod-server.ts ./prod-server.ts
 COPY --from=builder /app/src ./src
 
 EXPOSE 3000
 
-CMD ["node", ".output/server/index.mjs"]
+CMD ["npx", "tsx", "prod-server.ts"]
