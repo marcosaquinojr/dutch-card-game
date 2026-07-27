@@ -43,6 +43,11 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
       <div className="glass-strong max-w-md rounded-3xl p-10 text-center">
         <h1 className="font-display text-xl font-bold">A partida sofreu um crash</h1>
         <p className="mt-2 text-sm text-white/60">Reembaralhe e tente de novo.</p>
+        {error?.message && (
+          <p className="mt-2 rounded-xl bg-red-500/10 p-3 text-xs font-mono text-red-300 border border-red-500/20 text-left overflow-auto max-h-32">
+            {error.message}
+          </p>
+        )}
         <div className="mt-6 flex justify-center gap-2">
           <button
             onClick={() => { router.invalidate(); reset(); }}

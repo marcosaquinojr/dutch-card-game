@@ -9,9 +9,9 @@ import { useRoom, useGame, useChat } from "@/lib/socket-client";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/lobby")({
-  validateSearch: (search: Record<string, unknown>) => ({
-    code: (search.code as string) || undefined,
-    quick: (search.quick as string) || undefined,
+  validateSearch: (search: Record<string, unknown>): { code?: string; quick?: string } => ({
+    code: typeof search.code === "string" && search.code ? search.code : undefined,
+    quick: typeof search.quick === "string" && search.quick ? search.quick : undefined,
   }),
   head: () => ({
     meta: [
