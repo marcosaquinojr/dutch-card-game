@@ -1,7 +1,7 @@
 import { createServer } from "node:http";
 import { Server as SocketIOServer } from "socket.io";
-import { registerSocketHandlers } from "./src/server/socket-handler";
-import type { ClientToServerEvents, ServerToClientEvents } from "./src/game/types";
+import { registerSocketHandlers } from "./src/server/socket-handler.ts";
+import type { ClientToServerEvents, ServerToClientEvents } from "./src/game/types.ts";
 
 const REAL_PORT = Number(process.env.PORT || 3000);
 
