@@ -316,6 +316,13 @@ export function registerSocketHandlers(io: TypedServer): void {
         success: result.success,
       });
       emitGameStateToAll(io, room);
+
+      // Se foi espiada ('peek'), atualiza novamente após 5.2 segundos para virar para baixo
+      if (data.kind === 'peek') {
+        setTimeout(() => {
+          emitGameStateToAll(io, room);
+        }, 5200);
+      }
     });
 
     socket.on('game:call-dutch', () => {

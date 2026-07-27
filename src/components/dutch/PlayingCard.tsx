@@ -108,6 +108,6 @@ export function PlayingCard({ card, faceDown, size = "lg", selected, highlight, 
   );
 }
 
-export function CardBack({ size = "lg", className }: { size?: Props["size"]; className?: string }) {
-  return <PlayingCard faceDown size={size} className={className} />;
+export function CardBack({ size = "lg", className, onClick }: { size?: Props["size"]; className?: string; onClick?: () => void }) {
+  return <PlayingCard faceDown size={size} className={className} onClick={onClick} />;
 }

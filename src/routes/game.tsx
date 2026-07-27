@@ -209,26 +209,62 @@ function Game() {
 
           {/* Carta recém-comprada (se houver) */}
           {drawnCard && (
-            <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="flex items-center gap-2 bg-white/10 rounded-2xl p-2 border border-[color:var(--neon)]">
-              <span className="text-xs text-white/80 font-bold px-2">Comprada: {drawnCard.value}{drawnCard.suit}</span>
-              <button onClick={() => handleDiscardHandCard(0)} className="text-xs bg-red-500/20 text-red-300 px-3 py-1 rounded-full font-bold">Descartar</button>
+            <motion.div
+              initial={{ y: 20, opacity: 0, scale: 0.9 }}
+              animate={{ y: 0, opacity: 1, scale: 1 }}
+              className="flex flex-col items-center gap-3 rounded-3xl glass-strong border-2 border-[color:var(--neon)] p-4 shadow-2xl max-w-md text-center bg-black/60 backdrop-blur-xl"
+            >
+              <div className="text-xs uppercase tracking-widest text-[color:var(--neon)] font-extrabold flex items-center gap-1.5">
+                <Sparkles className="h-4 w-4" /> Carta Comprada: {drawnCard.value}{drawnCard.suit}
+              </div>
+              <div className="flex items-center gap-4">
+                <PlayingCard card={drawnCard} size="md" />
+                <div className="text-left space-y-1">
+                  <div className="text-sm font-bold text-white">
+                    {drawnCard.value} de {drawnCard.suit} ({drawnCard.points} pt)
+                  </div>
+                  <p className="text-xs text-white/75">
+                    👉 Clique em uma das suas cartas abaixo para <span className="text-[color:var(--neon)] font-bold uppercase underline">Trocar</span>, ou discarte-a diretamente.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  const wasQueen = drawnCard.value === "Q";
+                  handleDiscardHandCard(0);
+                  if (wasQueen) {
+                    toast("Você descartou uma Q (Dama)! Escolha uma carta para olhar.", { icon: "👁️" });
+                    setModalKind("peek");
+                  }
+                }}
+                className="w-full rounded-full bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/40 py-2 text-xs font-bold transition-all"
+              >
+                Descartar {drawnCard.value}{drawnCard.suit} sem trocar
+              </button>
             </motion.div>
           )}
 
-          <PlayerHand
-            cards={gameState.yourHand}
-            faceDown
-            revealedIndexes={gameState.yourKnownCards}
-            size="lg"
-            compact
-            onCardClick={(index: number) => {
-              if (drawnCard) {
-                handleSwapHandCard(index);
-              } else {
-                handleDiscardHandCard(index);
-              }
-            }}
-          />
+          <div className="relative">
+            {drawnCard && (
+              <div className="absolute -top-7 inset-x-0 text-center text-[10px] font-extrabold uppercase tracking-widest text-[color:var(--neon)] animate-bounce">
+                👇 Clique em uma carta abaixo para trocar 👇
+              </div>
+            )}
+            <PlayerHand
+              cards={gameState.yourHand}
+              faceDown
+              revealedIndexes={gameState.yourKnownCards}
+              size="lg"
+              compact
+              onCardClick={(index: number) => {
+                if (drawnCard) {
+                  handleSwapHandCard(index);
+                } else {
+                  handleDiscardHandCard(index);
+                }
+              }}
+            />
+          </div>
 
           <div className="flex flex-wrap items-center justify-center gap-2">
             <ActionButton onClick={handleDrawDeck} label="Comprar Monte" tone="neon" />

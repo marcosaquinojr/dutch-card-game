@@ -41,12 +41,17 @@ export class GameEngine {
   }
   
   /**
-   * Transição memorize -> playing após timeout
+   * Transição memorize -> playing após timeout de 5 segundos.
+   * As cartas vistas inicialmente são viradas de volta para baixo (knownCards = []).
    */
   static endMemorize(room: GameRoom): void {
     if (room.phase === 'memorize') {
       room.phase = 'playing';
       room.turnStartedAt = Date.now();
+      // Virar todas as cartas de volta para baixo
+      room.players.forEach((p) => {
+        p.knownCards = [];
+      });
     }
   }
   
@@ -124,13 +129,20 @@ export class GameEngine {
 
     switch (kind) {
       case 'peek': {
-        // Olhar uma de suas próprias cartas
+        // Olhar uma de suas próprias cartas (fica visível por 5 segundos)
         if (targetCardIndex === undefined || targetCardIndex < 0 || targetCardIndex >= player.hand.length) {
           return { success: false };
         }
         if (!player.knownCards.includes(targetCardIndex)) {
           player.knownCards.push(targetCardIndex);
         }
+        // Vira a carta de volta para baixo após 5 segundos
+        setTimeout(() => {
+          const idx = player.knownCards.indexOf(targetCardIndex);
+          if (idx !== -1) {
+            player.knownCards.splice(idx, 1);
+          }
+        }, 5000);
         return { success: true, card: player.hand[targetCardIndex] };
       }
 

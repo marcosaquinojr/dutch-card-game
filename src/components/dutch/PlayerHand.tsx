@@ -27,7 +27,7 @@ export function PlayerHand({ cards, faceDown = true, revealedIndexes = [], onCar
             transition={{ delay: i * 0.08, type: "spring", stiffness: 200, damping: 20 }}
           >
             {faceDown && !revealed ? (
-              <CardBack size={size} />
+              <CardBack size={size} onClick={onCardClick ? () => onCardClick(i) : undefined} />
             ) : (
               <PlayingCard
                 card={c}
