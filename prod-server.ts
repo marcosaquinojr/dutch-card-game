@@ -8,9 +8,10 @@ const PORT = Number(process.env.PORT || 3000);
 async function start() {
   process.env.PORT = "0";
 
-  // 1. Carrega o build de produção do Nitro
+  // 1. Carrega o build de produção do Nitro dinamicamente no runtime (ignora no build time)
+  const serverPath = "./.output/server/index.mjs";
   // @ts-ignore
-  await import("./.output/server/index.mjs");
+  await import(/* @vite-ignore */ serverPath);
 
   // @ts-ignore
   const nitroApp = globalThis.__nitro__?.default;
