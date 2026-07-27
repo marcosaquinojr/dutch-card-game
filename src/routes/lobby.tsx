@@ -5,13 +5,13 @@ import { ArrowLeft, Copy, MessageSquare, Play, Send, User, Share2 } from "lucide
 import { DutchLogo } from "@/components/dutch/DutchLogo";
 import { PlayerAvatar } from "@/components/dutch/PlayerAvatar";
 import { Input } from "@/components/ui/input";
-import { useRoom, useChat } from "@/lib/socket-client";
+import { useRoom, useGame, useChat } from "@/lib/socket-client";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/lobby")({
   validateSearch: (search: Record<string, unknown>) => ({
-    code: (search.code as string) || "",
-    quick: (search.quick as string) || "",
+    code: (search.code as string) || undefined,
+    quick: (search.quick as string) || undefined,
   }),
   head: () => ({
     meta: [
