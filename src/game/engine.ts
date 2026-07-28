@@ -3,12 +3,10 @@ import { createDeck, shuffleDeck, dealCards } from './deck';
 
 export class GameEngine {
   /**
-   * Calcula cartas visíveis iniciais baseado em cardsPerPlayer
+   * No Dutch clássico, o jogador olha 2 de suas cartas no início por 5s
    */
   static getInitialVisibleCount(cardsPerPlayer: number): number {
-    // Exemplo: 4 cartas = vê 2; 6 cartas = vê 2 ou 3?
-    // Regra simples: metade das cartas arredondado para baixo
-    return Math.floor(cardsPerPlayer / 2);
+    return 2;
   }
 
   /**
