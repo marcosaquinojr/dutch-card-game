@@ -110,7 +110,17 @@ export function useRoom() {
     if (s) s.emit('game:start');
   }, []);
 
-  return { roomState, error, createRoom, joinRoom, leaveRoom, setReady, startGame };
+  const addBot = useCallback(() => {
+    const s = connectSocket();
+    if (s) s.emit('room:add-bot');
+  }, []);
+
+  const removeBot = useCallback((botId: string) => {
+    const s = connectSocket();
+    if (s) s.emit('room:remove-bot', { botId });
+  }, []);
+
+  return { roomState, error, createRoom, joinRoom, leaveRoom, setReady, startGame, addBot, removeBot };
 }
 
 /** Hook: estado reativo do jogo */

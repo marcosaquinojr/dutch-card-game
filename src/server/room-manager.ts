@@ -216,6 +216,56 @@ export class RoomManager {
     }
   }
 
+  /** Adiciona um Bot / Jogador Simulado na sala */
+  addBot(code: string): ServerPlayer | null {
+    const normalizedCode = this.normalizeCode(code);
+    const room = this.rooms.get(normalizedCode) || this.rooms.get(code);
+    if (!room) return null;
+    if (room.players.length >= room.settings.maxPlayers) return null;
+
+    const botCount = room.players.filter((p) => p.isBot).length;
+    const botNames = ["Bot Carlos", "Bot Sofia", "Bot Lucas", "Bot Bia", "Bot Tiago", "Bot Rafael"];
+    const botAvatars = [
+      "https://api.dicebear.com/9.x/adventurer/svg?seed=Ace&backgroundColor=312e81",
+      "https://api.dicebear.com/9.x/adventurer/svg?seed=Nova&backgroundColor=4c1d95",
+      "https://api.dicebear.com/9.x/adventurer/svg?seed=Rook&backgroundColor=0c4a6e",
+      "https://api.dicebear.com/9.x/adventurer/svg?seed=Ivy&backgroundColor=134e4a",
+      "https://api.dicebear.com/9.x/adventurer/svg?seed=Kai&backgroundColor=581c87",
+      "https://api.dicebear.com/9.x/adventurer/svg?seed=Leo&backgroundColor=1e293b",
+    ];
+
+    const botId = `bot-${crypto.randomUUID().slice(0, 8)}`;
+    const bot: ServerPlayer = {
+      id: botId,
+      socketId: `bot-socket-${botId}`,
+      name: botNames[botCount % botNames.length],
+      avatar: botAvatars[botCount % botAvatars.length],
+      isHost: false,
+      ready: true,
+      isBot: true,
+      hand: [],
+      knownCards: [],
+      score: 0,
+      connected: true,
+    };
+
+    room.players.push(bot);
+    return bot;
+  }
+
+  /** Remove um Bot da sala */
+  removeBot(code: string, botId: string): boolean {
+    const normalizedCode = this.normalizeCode(code);
+    const room = this.rooms.get(normalizedCode) || this.rooms.get(code);
+    if (!room) return false;
+    const idx = room.players.findIndex((p) => p.id === botId && p.isBot);
+    if (idx !== -1) {
+      room.players.splice(idx, 1);
+      return true;
+    }
+    return false;
+  }
+
   /** Remove salas inativas há mais de 30 minutos */
   cleanupStaleRooms(): void {
     const now = Date.now();

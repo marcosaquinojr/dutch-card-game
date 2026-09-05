@@ -32,10 +32,126 @@ function emitRoomStateToAll(io: TypedServer, room: GameRoom): void {
   io.to(room.code).emit('room:state', state);
 }
 
+/** IA / Jogada Simulada do Bot */
+function checkBotTurn(io: TypedServer, room: GameRoom): void {
+  if (room.phase !== 'playing' && room.phase !== 'dutch-called') return;
+
+  const currentP = room.players[room.currentTurnIndex];
+  if (!currentP || !currentP.isBot) return;
+
+  clearTurnTimer(room);
+
+  // Aguarda 1.6 segundos para simular ação humana
+  setTimeout(() => {
+    if (room.phase !== 'playing' && room.phase !== 'dutch-called') return;
+    if (room.players[room.currentTurnIndex]?.id !== currentP.id) return;
+
+    // 1. Decisão de Bater na Mesa (DUTCH):
+    const knownPoints = currentP.knownCards.reduce((acc, idx) => acc + (currentP.hand[idx]?.points || 0), 0);
+    const shouldCallDutch =
+      room.phase === 'playing' &&
+      room.dutchCallerId === null &&
+      currentP.knownCards.length >= 2 &&
+      knownPoints <= 6 &&
+      Math.random() < 0.75;
+
+    if (shouldCallDutch) {
+      const success = GameEngine.callDutch(room, currentP.id);
+      if (success) {
+        io.to(room.code).emit('game:dutch-called', {
+          playerId: currentP.id,
+          playerName: currentP.name,
+        });
+        const dutchMsg: ChatMessage = {
+          id: crypto.randomUUID(),
+          author: 'Sistema',
+          text: `🚩 ${currentP.name} (Bot) BATEU NA MESA E CHAMOU DUTCH! As cartas dele estão travadas 🔒.`,
+          time: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+          system: true,
+        };
+        io.to(room.code).emit('chat:new', dutchMsg);
+
+        if ((room.phase as string) === 'round-end') {
+          handleRoundEnd(io, room);
+        } else {
+          emitGameStateToAll(io, room);
+          startTurnTimer(io, room);
+        }
+        return;
+      }
+    }
+
+    // 2. Comprar do Monte
+    const drawn = GameEngine.drawFromDeck(room, currentP.id);
+    if (!drawn) {
+      GameEngine.nextTurn(room);
+      emitGameStateToAll(io, room);
+      startTurnTimer(io, room);
+      return;
+    }
+
+    emitGameStateToAll(io, room);
+
+    // Aguarda 1.3s após comprar para decidir trocar ou descartar
+    setTimeout(() => {
+      if (room.players[room.currentTurnIndex]?.id !== currentP.id) return;
+
+      const isGoodCard = drawn.points <= 5; // A, 2, 3, 4, 5, ou Rei Preto (-1)
+
+      if (isGoodCard && currentP.hand.length > 0) {
+        // Troca por uma carta desconhecida ou a de maior valor
+        let chosenIdx = currentP.hand.findIndex((_, idx) => !currentP.knownCards.includes(idx));
+        if (chosenIdx === -1) {
+          chosenIdx = currentP.knownCards.reduce(
+            (maxIdx, idx) => (currentP.hand[idx]?.points > currentP.hand[maxIdx]?.points ? idx : maxIdx),
+            0,
+          );
+        }
+
+        const { effect } = GameEngine.swapDrawnWithHand(room, currentP.id, chosenIdx);
+
+        if (effect === 'queen-peek') {
+          const unknownIdx = currentP.hand.findIndex((_, i) => !currentP.knownCards.includes(i));
+          if (unknownIdx !== -1) GameEngine.queenPeek(room, currentP.id, unknownIdx);
+        } else if (effect === 'jack-swap') {
+          const other = room.players.find((p) => p.id !== currentP.id && !room.lockedPlayerIds.includes(p.id));
+          if (other && other.hand.length > 0) {
+            GameEngine.jackSwap(room, currentP.id, currentP.id, 0, other.id, 0);
+          }
+        }
+      } else {
+        // Descarta direto sem trocar
+        const { effect } = GameEngine.discardDrawnCard(room, currentP.id);
+        if (effect === 'queen-peek') {
+          const unknownIdx = currentP.hand.findIndex((_, i) => !currentP.knownCards.includes(i));
+          if (unknownIdx !== -1) GameEngine.queenPeek(room, currentP.id, unknownIdx);
+        } else if (effect === 'jack-swap') {
+          const other = room.players.find((p) => p.id !== currentP.id && !room.lockedPlayerIds.includes(p.id));
+          if (other && other.hand.length > 0) {
+            GameEngine.jackSwap(room, currentP.id, currentP.id, 0, other.id, 0);
+          }
+        }
+      }
+
+      GameEngine.nextTurn(room);
+
+      if (room.phase === 'round-end') {
+        handleRoundEnd(io, room);
+      } else {
+        emitGameStateToAll(io, room);
+        startTurnTimer(io, room);
+      }
+    }, 1300);
+  }, 1600);
+}
+
 /** Configura timer para o turno atual */
 function startTurnTimer(io: TypedServer, room: GameRoom): void {
   clearTurnTimer(room);
   room.turnStartedAt = Date.now();
+
+  // Se o jogador atual for bot, ativa a IA simulada
+  checkBotTurn(io, room);
 
   room.turnTimer = setTimeout(() => {
     // Tempo esgotou — avança turno automaticamente
@@ -176,6 +292,29 @@ export function registerSocketHandlers(io: TypedServer): void {
       if (room) {
         emitRoomStateToAll(io, room);
       }
+    });
+
+    socket.on('room:add-bot', () => {
+      const roomData = roomManager.getRoomBySocketId(socket.id);
+      if (!roomData) return;
+      const { room, player } = roomData;
+      if (!player.isHost) return;
+
+      const bot = roomManager.addBot(room.code);
+      if (bot) {
+        emitRoomStateToAll(io, room);
+        console.log(`🤖 Bot ${bot.name} adicionado à sala ${room.code}`);
+      }
+    });
+
+    socket.on('room:remove-bot', (data) => {
+      const roomData = roomManager.getRoomBySocketId(socket.id);
+      if (!roomData) return;
+      const { room, player } = roomData;
+      if (!player.isHost) return;
+
+      roomManager.removeBot(room.code, data.botId);
+      emitRoomStateToAll(io, room);
     });
 
     // ── Eventos de Jogo ──

@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect } from "react";
-import { ArrowLeft, Copy, MessageSquare, Play, Send, User, Share2 } from "lucide-react";
+import { ArrowLeft, Copy, MessageSquare, Play, Send, User, Share2, Bot } from "lucide-react";
 import { DutchLogo } from "@/components/dutch/DutchLogo";
 import { PlayerAvatar } from "@/components/dutch/PlayerAvatar";
 import { Input } from "@/components/ui/input";
@@ -9,9 +9,10 @@ import { useRoom, useGame, useChat } from "@/lib/socket-client";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/lobby")({
-  validateSearch: (search: Record<string, unknown>): { code?: string; quick?: string } => ({
+  validateSearch: (search: Record<string, unknown>): { code?: string; quick?: string; bots?: string } => ({
     code: typeof search.code === "string" && search.code ? search.code : undefined,
     quick: typeof search.quick === "string" && search.quick ? search.quick : undefined,
+    bots: typeof search.bots === "string" && search.bots ? search.bots : undefined,
   }),
   head: () => ({
     meta: [
@@ -27,7 +28,7 @@ export const Route = createFileRoute("/lobby")({
 function Lobby() {
   const nav = useNavigate();
   const search = Route.useSearch();
-  const { roomState, error, joinRoom, leaveRoom, setReady, startGame } = useRoom();
+  const { roomState, error, createRoom, joinRoom, leaveRoom, setReady, startGame, addBot, removeBot } = useRoom();
   const { gameState } = useGame();
   const { messages, sendMessage } = useChat();
 
@@ -35,6 +36,12 @@ function Lobby() {
   const [joinCodeInput, setJoinCodeInput] = useState(search.code || "");
   const [draft, setDraft] = useState("");
   const [isJoining, setIsJoining] = useState(false);
+
+  const me = roomState ? (roomState.players.find((p) => p.name === playerName) || roomState.players[0]) : null;
+  const isHost = Boolean(me?.isHost);
+  const isReady = Boolean(me?.ready);
+  const readyCount = roomState ? roomState.players.filter((p) => p.ready).length : 0;
+  const canStart = isHost && Boolean(roomState && roomState.players.length >= 2);
 
   // Redireciona para o jogo quando a partida inicia
   useEffect(() => {
@@ -72,6 +79,40 @@ function Lobby() {
       });
     }
   }, [search.code, roomState, playerName, joinRoom]);
+
+  // Se entrou via "Partida com Bots" e não está em uma sala ainda, cria automaticamente
+  useEffect(() => {
+    if (search.bots === "1" && !roomState && !isJoining) {
+      const name = playerName || "Você";
+      if (typeof window !== "undefined") {
+        localStorage.setItem("dutch_playerName", name);
+      }
+      setIsJoining(true);
+      createRoom({
+        playerName: name,
+        avatar: `https://api.dicebear.com/9.x/adventurer/svg?seed=${encodeURIComponent(name)}&backgroundColor=1e293b`,
+        roomName: "Partida Simulada (Bots)",
+        settings: {
+          maxPlayers: 4,
+          cardsPerPlayer: 4,
+          turnTimeSeconds: 45,
+          maxScore: 100,
+          specialCards: true,
+          simultaneousDiscard: true,
+        },
+      });
+    }
+  }, [search.bots, roomState, isJoining, playerName, createRoom]);
+
+  // Se entrou via "Partida com Bots", preenche a sala com bots automaticamente até 4 jogadores
+  useEffect(() => {
+    if (search.bots === "1" && roomState && isHost && roomState.players.length < 4) {
+      const timer = setTimeout(() => {
+        addBot();
+      }, 350);
+      return () => clearTimeout(timer);
+    }
+  }, [search.bots, roomState, isHost, addBot]);
 
   const handleJoinByCode = (e: React.FormEvent) => {
     e.preventDefault();
@@ -161,13 +202,6 @@ function Lobby() {
     );
   }
 
-  // Descobre se eu sou o host e meu status de pronto
-  const me = roomState.players.find((p) => p.name === playerName) || roomState.players[0];
-  const isHost = me?.isHost;
-  const isReady = me?.ready;
-  const readyCount = roomState.players.filter((p) => p.ready).length;
-  const canStart = isHost && roomState.players.length >= 2;
-
   const handleShareLink = () => {
     if (!roomState) return;
     const url = `${window.location.origin}/lobby?code=${roomState.code}`;
@@ -211,7 +245,15 @@ function Lobby() {
                   {roomState.settings.maxPlayers} jogadores max · {roomState.settings.cardsPerPlayer} cartas · {roomState.settings.turnTimeSeconds}s por turno · até {roomState.settings.maxScore} pts
                 </div>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
+                {isHost && roomState.players.length < roomState.settings.maxPlayers && (
+                  <button
+                    onClick={() => addBot()}
+                    className="shrink-0 flex items-center gap-2 rounded-full border border-sky-500/40 bg-sky-500/20 px-3.5 py-2 text-xs font-bold hover:bg-sky-500/30 text-sky-200 transition-all glow-sky"
+                  >
+                    <Bot className="h-3.5 w-3.5" /> + Bot 🤖
+                  </button>
+                )}
                 <button
                   onClick={handleShareLink}
                   className="shrink-0 flex items-center gap-2 rounded-full gradient-neon px-4 py-2 text-sm font-bold text-black glow-neon"
@@ -240,7 +282,24 @@ function Lobby() {
                     layout
                     className={`relative flex flex-col items-center gap-3 rounded-2xl glass border border-white/10 p-4 ${p.isHost ? "ring-1 ring-[color:var(--gold)]/50" : ""}`}
                   >
+                    {p.isBot && isHost && (
+                      <button
+                        onClick={() => removeBot(p.id)}
+                        className="absolute top-2 right-2 h-6 w-6 rounded-full bg-red-500/20 text-red-300 hover:bg-red-500/40 flex items-center justify-center text-xs"
+                        title="Remover Bot"
+                      >
+                        ✕
+                      </button>
+                    )}
                     <PlayerAvatar name={p.name} avatar={p.avatar} isHost={p.isHost} ready={p.ready} size="lg" />
+                    <div className="flex items-center gap-1.5 max-w-full px-1">
+                      <span className="font-semibold text-xs truncate max-w-[90px]">{p.name}</span>
+                      {p.isBot && (
+                        <span className="rounded bg-sky-500/20 px-1.5 py-0.5 text-[9px] font-bold uppercase text-sky-300">
+                          BOT
+                        </span>
+                      )}
+                    </div>
                     <span className={`rounded-full px-3 py-0.5 text-[10px] font-bold uppercase tracking-wider ${p.ready ? "bg-emerald-500/20 text-emerald-300" : "bg-amber-500/20 text-amber-300"}`}>
                       {p.ready ? "Pronto" : "Aguardando"}
                     </span>

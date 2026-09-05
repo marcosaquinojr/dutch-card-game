@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { motion } from "framer-motion";
-import { Play, PlusCircle, LogIn, BookOpen, Settings } from "lucide-react";
+import { Play, PlusCircle, LogIn, BookOpen, Settings, Bot } from "lucide-react";
 import { DutchLogo } from "@/components/dutch/DutchLogo";
 import { FloatingCardsBackground } from "@/components/dutch/FloatingCardsBackground";
 
@@ -17,9 +17,10 @@ export const Route = createFileRoute("/")({
 });
 
 const MENU = [
-  { to: "/lobby", label: "Jogar Online", desc: "Encontrar oponentes agora", Icon: Play, variant: "primary" as const, search: { quick: "1" } },
-  { to: "/create-room", label: "Criar Sala", desc: "Configure sua partida", Icon: PlusCircle, variant: "gold" as const },
-  { to: "/lobby", label: "Entrar em Sala", desc: "Use um código de convite", Icon: LogIn, variant: "purple" as const },
+  { to: "/lobby", label: "Partida com Bots (Simulada)", desc: "Teste local imediato contra IA", Icon: Bot, variant: "primary" as const, search: { bots: "1" } },
+  { to: "/lobby", label: "Jogar Online", desc: "Encontrar oponentes agora", Icon: Play, variant: "gold" as const, search: { quick: "1" } },
+  { to: "/create-room", label: "Criar Sala", desc: "Configure sua partida privada", Icon: PlusCircle, variant: "purple" as const },
+  { to: "/lobby", label: "Entrar em Sala", desc: "Use um código de convite", Icon: LogIn, variant: "ghost" as const },
   { to: "/tutorial", label: "Tutorial", desc: "Aprenda as regras", Icon: BookOpen, variant: "ghost" as const },
   { to: "/settings", label: "Configurações", desc: "Áudio, tema e conta", Icon: Settings, variant: "ghost" as const },
 ];
@@ -74,12 +75,13 @@ function Home() {
 }
 
 function MenuButton({
-  to, label, desc, Icon, variant, big,
+  to, label, desc, Icon, variant, big, search,
 }: {
   to: string; label: string; desc: string;
   Icon: React.ComponentType<{ className?: string }>;
   variant: "primary" | "gold" | "purple" | "ghost";
   big?: boolean;
+  search?: Record<string, any>;
 }) {
   const styles: Record<string, string> = {
     primary: "gradient-neon text-black glow-neon",
@@ -89,7 +91,8 @@ function MenuButton({
   };
   return (
     <Link
-      to={to}
+      to={to as any}
+      search={search as any}
       className={`group relative flex items-center gap-4 overflow-hidden rounded-2xl border border-white/10 p-5 transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl ${styles[variant]} ${big ? "p-6" : ""}`}
     >
       <div className={`grid ${big ? "h-14 w-14" : "h-11 w-11"} place-items-center rounded-xl bg-black/25 backdrop-blur`}>

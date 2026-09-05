@@ -28,6 +28,7 @@ export interface ServerPlayer {
   avatar: string;
   isHost: boolean;
   ready: boolean;
+  isBot?: boolean;
   hand: CardModel[];          // servidor conhece todas as cartas
   knownCards: number[];       // índices das cartas que o jogador já viu
   score: number;              // pontuação cumulativa através das rodadas
@@ -63,6 +64,7 @@ export interface ClientPlayer {
   avatar: string;
   isHost: boolean;
   ready: boolean;
+  isBot?: boolean;
   cardsCount: number;         // quantas cartas eles têm
   score: number;
   connected: boolean;
@@ -119,6 +121,8 @@ export interface ClientToServerEvents {
   'room:join': (data: { code: string; playerName: string; avatar: string; password?: string }) => void;
   'room:leave': () => void;
   'room:ready': (data: { ready: boolean }) => void;
+  'room:add-bot': () => void;
+  'room:remove-bot': (data: { botId: string }) => void;
   'game:start': () => void;
   'game:draw-deck': () => void;
   'game:draw-discard': () => void;
