@@ -574,11 +574,11 @@ function Game() {
           )}
         </div>
 
-        {/* Sua Área: Grade 2x2 com todas as 4 cartas 100% visíveis */}
+        {/* Sua Área: Cartas dispostas lado a lado na horizontal */}
         <div className="relative z-10 flex flex-col items-center gap-1 pb-2">
           {drawnCard && (
             <div className="text-xs font-black uppercase tracking-widest text-[color:var(--neon)] animate-bounce flex items-center gap-1 bg-black/70 px-3.5 py-1 rounded-full border border-[color:var(--neon)]/50 shadow-lg">
-              👇 Clique em uma das 4 cartas abaixo para substituir 👇
+              👇 Clique em uma das suas cartas para substituir 👇
             </div>
           )}
 
@@ -597,7 +597,7 @@ function Game() {
             faceDown
             revealedIndexes={gameState.yourKnownCards}
             size="md"
-            layout="grid"
+            layout="row"
             isLocked={isMeLocked}
             canMatch={!!gameState.discardTop}
             swapActive={Boolean(drawnCard || jackMode === "selecting-first" || jackMode === "selecting-second")}
@@ -623,7 +623,7 @@ function Game() {
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-40 grid place-items-center bg-black/85 backdrop-blur-xl"
           >
-            <div className="text-center max-w-md px-4">
+            <div className="text-center max-w-lg px-4">
               <motion.div
                 initial={{ scale: 0.7, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
@@ -632,9 +632,9 @@ function Game() {
                 MEMORIZE SUAS CARTAS
               </motion.div>
               <p className="mb-6 text-xs uppercase tracking-[0.3em] text-white/70">
-                Você pode ver 2 cartas da sua grade por 5 segundos
+                Você pode ver 2 cartas por 5 segundos
               </p>
-              <div className="grid grid-cols-2 gap-3 max-w-xs mx-auto">
+              <div className="flex items-center justify-center gap-3 max-w-lg mx-auto">
                 {gameState.yourHand.map((c, i) => {
                   const isVisible = gameState.yourKnownCards.includes(i);
                   return (
@@ -644,8 +644,8 @@ function Game() {
                       ) : (
                         <CardBack size="md" />
                       )}
-                      <span className="mt-1 text-[9px] uppercase font-bold text-white/50">
-                        {i === 0 ? "Cima Esq" : i === 1 ? "Cima Dir" : i === 2 ? "Baixo Esq" : "Baixo Dir"}
+                      <span className="mt-1.5 text-[10px] uppercase font-bold text-white/70">
+                        Carta {i + 1}
                       </span>
                     </div>
                   );

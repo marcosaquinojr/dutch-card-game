@@ -29,7 +29,7 @@ export function PlayerHand({
   selectedIndex,
   size = "md",
   compact = false,
-  layout = "grid",
+  layout = "row",
   isLocked = false,
   canMatch = false,
   swapActive = false,
@@ -57,7 +57,7 @@ export function PlayerHand({
         className={cn(
           isGridLayout
             ? "grid grid-cols-2 gap-2.5 sm:gap-3.5 max-w-[260px]"
-            : cn("flex items-end justify-center", compact ? "-space-x-5" : "gap-3"),
+            : cn("flex items-end justify-center", compact ? "-space-x-5" : "gap-2.5 sm:gap-4 flex-nowrap"),
         )}
       >
         {cards.map((c, i) => {
@@ -102,25 +102,25 @@ export function PlayerHand({
                 />
               )}
 
-              {/* Tag com posição da grade */}
-              {isGridLayout && (
-                <span
-                  className={cn(
-                    "mt-1 text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full transition-all",
-                    selectedIndex === i
-                      ? "bg-yellow-400/20 text-yellow-300 border border-yellow-400/40 font-extrabold"
-                      : swapActive
-                        ? "bg-[color:var(--neon)]/20 text-[color:var(--neon)] border border-[color:var(--neon)]/40 font-extrabold"
-                        : "text-white/50 group-hover:text-white/90 bg-black/30",
-                  )}
-                >
-                  {selectedIndex === i
-                    ? `Selecionada (${i + 1})`
+              {/* Tag com posição/número da carta */}
+              <span
+                className={cn(
+                  "mt-1.5 text-[10px] sm:text-[11px] uppercase font-bold tracking-wider px-2.5 py-0.5 rounded-full transition-all whitespace-nowrap",
+                  selectedIndex === i
+                    ? "bg-yellow-400/25 text-yellow-300 border border-yellow-400/50 font-extrabold shadow-sm"
                     : swapActive
-                      ? `Trocar ${i + 1}`
-                      : getPositionName(i, cards.length)}
-                </span>
-              )}
+                      ? "bg-[color:var(--neon)]/20 text-[color:var(--neon)] border border-[color:var(--neon)]/50 font-extrabold shadow-sm"
+                      : "text-white/60 group-hover:text-white/95 bg-black/40 border border-white/10",
+                )}
+              >
+                {selectedIndex === i
+                  ? `Selecionada (${i + 1})`
+                  : swapActive
+                    ? `Trocar ${i + 1}`
+                    : isGridLayout
+                      ? getPositionName(i, cards.length)
+                      : `Carta ${i + 1}`}
+              </span>
 
               {/* Botão de Descarte Igual (Snap) se habilitado e não em modo troca */}
               {canMatch && onMatchClick && !isLocked && !swapActive && (

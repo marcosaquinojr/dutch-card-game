@@ -132,10 +132,10 @@ export function SpecialCardModal({
             {/* Conteúdo para a Dama (Peek) */}
             {isPeek && (
               <div className="mt-6">
-                <div className="mb-3 text-xs uppercase tracking-widest text-white/60 font-semibold">
-                  Sua grade de cartas:
+                <div className="mb-3 text-xs uppercase tracking-widest text-white/60 font-semibold text-center">
+                  Suas cartas (escolha uma para espiar):
                 </div>
-                <div className="grid grid-cols-2 gap-3 max-w-xs mx-auto">
+                <div className="flex items-center justify-center gap-3 max-w-md mx-auto">
                   {yourHand.map((c, i) => (
                     <button
                       key={c.id || i}
@@ -149,8 +149,8 @@ export function SpecialCardModal({
                       )}
                     >
                       <CardBack size="md" />
-                      <span className="mt-1 text-[10px] text-white/60 font-bold uppercase">
-                        {i === 0 ? "Cima Esq" : i === 1 ? "Cima Dir" : i === 2 ? "Baixo Esq" : "Baixo Dir"}
+                      <span className="mt-1 text-[10px] text-white/70 font-bold uppercase">
+                        Carta {i + 1}
                       </span>
                     </button>
                   ))}
