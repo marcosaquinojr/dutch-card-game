@@ -105,6 +105,7 @@ export interface RoundResult {
   bonusOrPenalty: number;      // bônus/penalidade do chamador do dutch
   roundTotal: number;
   cumulativeScore: number;
+  reason?: string;
 }
 
 export interface ChatMessage {
@@ -148,8 +149,8 @@ export interface ServerToClientEvents {
   'game:card-drawn': (data: { card: CardModel; fromDeck: boolean }) => void;
   'game:special-result': (data: { kind: string; card?: CardModel; success: boolean }) => void;
   'game:dutch-called': (data: { playerId: string; playerName: string }) => void;
-  'game:round-end': (data: { results: RoundResult[] }) => void;
-  'game:end': (data: { results: RoundResult[]; winnerId: string }) => void;
+  'game:round-end': (data: { results: RoundResult[]; winnerId?: string; winnerName?: string; reason?: string }) => void;
+  'game:end': (data: { results: RoundResult[]; winnerId: string; winnerName?: string }) => void;
   'game:match-result': (data: {
     playerId: string;
     playerName: string;

@@ -272,11 +272,18 @@ export class GameEngine {
         .filter((idx) => idx !== handIndex)
         .map((idx) => (idx > handIndex ? idx - 1 : idx));
 
+      // Se o jogador descartou todas as cartas, encerra a rodada imediatamente!
+      if (player.hand.length === 0) {
+        room.phase = 'round-end';
+      }
+
       return {
         success: true,
         card,
         topDiscard,
-        message: `Acertou o par! Sua carta era ${card.value}${card.suit} e foi descartada. Você agora tem ${player.hand.length} carta(s)!`,
+        message: player.hand.length === 0
+          ? `🏆 Parabéns! Você descartou todas as suas cartas e venceu a rodada!`
+          : `Acertou o par! Sua carta era ${card.value}${card.suit} e foi descartada. Você agora tem ${player.hand.length} carta(s)!`,
         newCount: player.hand.length,
       };
     } else {

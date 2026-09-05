@@ -41,7 +41,10 @@ export function applyDutchBonus(results: RoundResult[], dutchCallerId: string | 
         ...r,
         bonusOrPenalty,
         roundTotal: r.handScore + bonusOrPenalty,
-        cumulativeScore: r.cumulativeScore - r.handScore + (r.handScore + bonusOrPenalty)
+        cumulativeScore: r.cumulativeScore - r.handScore + (r.handScore + bonusOrPenalty),
+        reason: success
+          ? 'Bateu Dutch com a menor pontuação (-5 pts bônus!) 🚩'
+          : 'Bateu Dutch mas não teve a menor pontuação (+10 pts penalidade) ❌',
       };
     }
     return r;
@@ -61,7 +64,8 @@ export function calculateRoundResults(room: GameRoom): RoundResult[] {
       handScore,
       bonusOrPenalty: 0,
       roundTotal: handScore,
-      cumulativeScore: player.score + handScore
+      cumulativeScore: player.score + handScore,
+      reason: player.hand.length === 0 ? 'Descartou todas as cartas (0 pts)! ⚡' : undefined,
     };
   });
 

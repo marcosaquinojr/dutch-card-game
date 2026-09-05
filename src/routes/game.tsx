@@ -49,6 +49,8 @@ function Game() {
     pendingEffect,
     setPendingEffect,
     matchResult,
+    dutchAlert,
+    clearDutchAlert,
     roundResults,
     gameResults,
     drawFromDeck,
@@ -107,6 +109,36 @@ function Game() {
       return () => clearTimeout(timer);
     }
   }, [matchResult]);
+
+  // Alerta sonoro e notificação dramática quando alguém chama DUTCH
+  useEffect(() => {
+    if (dutchAlert) {
+      toast.warning(`🚩 ${dutchAlert.playerName} BATEU NA MESA E CHAMOU DUTCH! Última rodada!`, {
+        duration: 8000,
+        icon: "🚨",
+      });
+
+      try {
+        const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+        if (AudioCtx) {
+          const ctx = new AudioCtx();
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = "sine";
+          osc.frequency.setValueAtTime(587.33, ctx.currentTime);
+          osc.frequency.setValueAtTime(880, ctx.currentTime + 0.15);
+          gain.gain.setValueAtTime(0.25, ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start();
+          osc.stop(ctx.currentTime + 0.5);
+        }
+      } catch {
+        // Ignora erro de áudio caso interação não tenha ocorrido
+      }
+    }
+  }, [dutchAlert]);
 
   // Redirecionamentos de fim de rodada / jogo
   useEffect(() => {
@@ -338,7 +370,21 @@ function Game() {
         </div>
       </div>
 
-      {/* Área da Mesa */}
+      {/* Barra de Aviso de Dutch Ativo */}
+      {gameState.phase === "dutch-called" && (
+        <motion.div
+          initial={{ y: -20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          className="relative z-20 w-full bg-gradient-to-r from-amber-600 via-yellow-500 to-amber-600 text-black py-1.5 px-4 text-center font-black text-xs uppercase tracking-wider shadow-lg flex items-center justify-center gap-2 animate-pulse"
+        >
+          <span className="text-sm">🚩</span>
+          <span>
+            DUTCH ATIVO: {gameState.players.find((p) => p.id === gameState.dutchCallerId)?.name || "Alguém"} BATEU NA MESA! ESTA É A ÚLTIMA RODADA PARA TODOS OS OUTROS! 🔒
+          </span>
+          <span className="text-sm">🚩</span>
+        </motion.div>
+      )}
+
       {/* Área da Mesa */}
       <div className="relative mx-auto h-[calc(100vh-65px)] max-w-5xl p-2 flex flex-col justify-between overflow-hidden">
         {/* Oponentes ao redor do topo da mesa */}
@@ -350,8 +396,8 @@ function Game() {
                 "flex items-center gap-2 rounded-2xl glass px-3 py-1.5 transition-all shadow-md",
                 gameState.currentTurnPlayerId === p.id
                   ? "ring-2 ring-[color:var(--neon)] glow-neon bg-black/60 scale-105"
-                  : p.isLocked
-                    ? "border border-amber-500/40 bg-amber-500/10"
+                  : p.isLocked || p.id === gameState.dutchCallerId
+                    ? "border-2 border-amber-400/80 bg-amber-500/20 glow-gold shadow-lg"
                     : "border border-white/10 bg-black/30",
               )}
             >
@@ -371,9 +417,9 @@ function Game() {
                     </span>
                   )}
                 </div>
-                {p.isLocked ? (
-                  <span className="flex items-center gap-0.5 text-[9px] font-extrabold text-amber-300 uppercase">
-                    <Lock className="h-2.5 w-2.5" /> Dutch
+                {p.isLocked || p.id === gameState.dutchCallerId ? (
+                  <span className="flex items-center gap-1 text-[9px] font-black text-amber-300 uppercase tracking-wider bg-amber-500/30 px-1.5 py-0.5 rounded border border-amber-400/40 animate-pulse">
+                    <Lock className="h-2.5 w-2.5" /> Bateu Dutch!
                   </span>
                 ) : (
                   <span className="text-[10px] text-white/50">{p.cardsCount} cartas</span>
@@ -582,6 +628,12 @@ function Game() {
             </div>
           )}
 
+          {isMeLocked && (
+            <div className="text-xs font-black uppercase tracking-widest text-amber-300 animate-pulse flex items-center gap-1.5 bg-amber-950/85 px-4 py-1.5 rounded-full border-2 border-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.6)]">
+              <Lock className="h-3.5 w-3.5 text-amber-400" /> VOCÊ BATEU NA MESA E CHAMOU DUTCH! Suas cartas estão travadas 🔒
+            </div>
+          )}
+
           {jackMode && (
             <div className="text-xs font-black uppercase tracking-widest text-yellow-300 animate-pulse flex items-center gap-1 bg-black/80 px-4 py-1.5 rounded-full border border-yellow-400/60 shadow-lg">
               {jackMode === "prompt"
@@ -773,7 +825,14 @@ function Game() {
                 )}
               >
                 {activeMatchModal.success ? (
-                  <p>🎉 <strong>Acerto perfeito!</strong> A carta foi descartada. Sua grade agora tem apenas <strong>{activeMatchModal.newCount}</strong> carta(s).</p>
+                  activeMatchModal.newCount === 0 ? (
+                    <div className="space-y-1 text-center">
+                      <p className="text-base font-black text-amber-300">🏆 ZEROU TODAS AS CARTAS!</p>
+                      <p>Você descartou sua última carta e venceu a rodada com 0 pontos!</p>
+                    </div>
+                  ) : (
+                    <p>🎉 <strong>Acerto perfeito!</strong> A carta foi descartada. Sua grade agora tem apenas <strong>{activeMatchModal.newCount}</strong> carta(s).</p>
+                  )
                 ) : (
                   <p>⚠️ <strong>Penalidade!</strong> As cartas eram diferentes ({activeMatchModal.card.value} ≠ {activeMatchModal.topDiscard.value}). Você comprou <strong>+1 carta de penalidade</strong> do monte!</p>
                 )}
@@ -787,6 +846,56 @@ function Game() {
                 )}
               >
                 Continuar
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Modal de Alerta Gigante e Dramático quando alguém chama DUTCH */}
+      <AnimatePresence>
+        {dutchAlert && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 grid place-items-center bg-black/85 backdrop-blur-md px-4"
+          >
+            <motion.div
+              initial={{ scale: 0.8, y: 30 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.8, y: 30 }}
+              transition={{ type: "spring", stiffness: 260, damping: 22 }}
+              className="glass-strong relative w-full max-w-md rounded-3xl p-6 sm:p-8 text-center border-2 border-amber-400 shadow-[0_0_60px_rgba(245,158,11,0.6)] space-y-4"
+            >
+              <div className="mx-auto grid h-20 w-20 place-items-center rounded-3xl bg-amber-500/20 text-amber-400 border border-amber-400/50 text-4xl shadow-inner animate-bounce">
+                🚩
+              </div>
+              <div>
+                <span className="inline-block px-3 py-1 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 text-[11px] font-black uppercase tracking-[0.25em] mb-2">
+                  BATIDA NA MESA!
+                </span>
+                <h2 className="font-display text-3xl sm:text-4xl font-black text-amber-300">
+                  {dutchAlert.playerName} chamou DUTCH!
+                </h2>
+              </div>
+              <div className="p-4 rounded-2xl bg-black/60 border border-amber-500/30 text-xs text-white/90 space-y-2 leading-relaxed text-left">
+                <div className="flex items-center gap-2 font-bold text-amber-300">
+                  <Lock className="h-4 w-4 shrink-0 text-amber-400" />
+                  <span>As cartas de {dutchAlert.playerName} foram TRAVADAS!</span>
+                </div>
+                <div className="flex items-center gap-2 text-white/80">
+                  <span className="text-base">⏳</span>
+                  <span>
+                    Todos os outros jogadores têm exatamente <strong>mais 1 último turno</strong> antes da contagem dos pontos!
+                  </span>
+                </div>
+              </div>
+              <button
+                onClick={clearDutchAlert}
+                className="w-full rounded-2xl gradient-gold py-3.5 font-display text-sm font-black text-black shadow-lg hover:scale-105 active:scale-95 transition-all cursor-pointer"
+              >
+                ENTENDI! VAMOS PARA A ÚLTIMA RODADA 🏁
               </button>
             </motion.div>
           </motion.div>

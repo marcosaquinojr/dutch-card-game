@@ -173,11 +173,19 @@ function clearTurnTimer(room: GameRoom): void {
 }
 
 /** Lida com o fim de rodada: calcula resultados, aplica scores, verifica game end */
-function handleRoundEnd(io: TypedServer, room: GameRoom): void {
+function handleRoundEnd(io: TypedServer, room: GameRoom, extraInfo?: { winnerId?: string; winnerName?: string; reason?: string }): void {
   clearTurnTimer(room);
 
   // Calcula resultados da rodada (já inclui bônus Dutch)
   const results = calculateRoundResults(room);
+
+  // Se extraInfo definiu um vencedor que zerou as cartas, atualiza o motivo
+  if (extraInfo?.winnerId) {
+    const wRes = results.find((r) => r.playerId === extraInfo.winnerId);
+    if (wRes && extraInfo.reason) {
+      wRes.reason = extraInfo.reason;
+    }
+  }
 
   // Aplica scores cumulativos nos jogadores
   for (const result of results) {
@@ -187,18 +195,28 @@ function handleRoundEnd(io: TypedServer, room: GameRoom): void {
     }
   }
 
+  const sorted = [...results].sort((a, b) => a.roundTotal - b.roundTotal);
+  const winner = sorted[0];
+
+  const roundPayload = {
+    results,
+    winnerId: extraInfo?.winnerId || winner?.playerId,
+    winnerName: extraInfo?.winnerName || winner?.playerName,
+    reason: extraInfo?.reason || (room.dutchCallerId ? `Rodada finalizada após DUTCH chamado por ${room.players.find((p) => p.id === room.dutchCallerId)?.name || 'jogador'}` : 'Menor pontuação'),
+  };
+
   // Emite resultados da rodada
-  io.to(room.code).emit('game:round-end', { results });
+  io.to(room.code).emit('game:round-end', roundPayload);
 
   // Verifica se o jogo acabou
   const gameEnd = checkGameEnd(room);
   if (gameEnd.ended) {
     room.phase = 'game-end';
-    // O vencedor é quem tem MENOR pontuação
-    const winner = room.players.reduce((prev, curr) =>
+    // O vencedor é quem tem MENOR pontuação geral
+    const overallWinner = room.players.reduce((prev, curr) =>
       prev.score < curr.score ? prev : curr,
     );
-    io.to(room.code).emit('game:end', { results, winnerId: winner.id });
+    io.to(room.code).emit('game:end', { results, winnerId: overallWinner.id, winnerName: overallWinner.name });
   }
 
   emitGameStateToAll(io, room);
@@ -624,6 +642,25 @@ export function registerSocketHandlers(io: TypedServer): void {
         system: true,
       };
       io.to(room.code).emit('chat:new', matchMsg);
+
+      // Se o jogador descartou todas as suas cartas, encerra a rodada imediatamente!
+      if (result.newCount === 0 || (room.phase as string) === 'round-end') {
+        const winMsg: ChatMessage = {
+          id: crypto.randomUUID(),
+          author: 'Sistema',
+          text: `🏆 ${player.name} DESCARTOU TODAS AS SUAS CARTAS E VENCEU A RODADA COM 0 PONTOS!`,
+          time: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+          system: true,
+        };
+        io.to(room.code).emit('chat:new', winMsg);
+
+        handleRoundEnd(io, room, {
+          winnerId: player.id,
+          winnerName: player.name,
+          reason: `${player.name} descartou todas as cartas e venceu a rodada com 0 pontos!`,
+        });
+        return;
+      }
 
       emitGameStateToAll(io, room);
     });
