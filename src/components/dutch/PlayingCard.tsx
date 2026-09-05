@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import type { CardModel } from "@/lib/dutch-mock";
@@ -31,26 +32,59 @@ function SpecialIcon({ kind }: { kind: NonNullable<CardModel["special"]> }) {
 
 export function PlayingCard({ card, faceDown, size = "lg", selected, highlight, onClick, className }: Props) {
   const s = SIZE[size];
+  const [tilt, setTilt] = useState({ rx: 0, ry: 0, gx: 50, gy: 50, glare: 0 });
+
+  const handlePointerMove = (e: React.PointerEvent<HTMLButtonElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const px = (x / rect.width - 0.5) * 2;
+    const py = (y / rect.height - 0.5) * 2;
+    setTilt({
+      rx: -py * 14,
+      ry: px * 14,
+      gx: (x / rect.width) * 100,
+      gy: (y / rect.height) * 100,
+      glare: 0.35,
+    });
+  };
+
+  const handlePointerLeave = () => {
+    setTilt({ rx: 0, ry: 0, gx: 50, gy: 50, glare: 0 });
+  };
+
   return (
     <motion.button
       type="button"
       onClick={onClick}
-      whileHover={onClick ? { y: -8, scale: 1.04 } : undefined}
-      whileTap={onClick ? { scale: 0.97 } : undefined}
+      onPointerMove={handlePointerMove}
+      onPointerLeave={handlePointerLeave}
+      whileHover={onClick ? { y: -8, scale: 1.05 } : undefined}
+      whileTap={onClick ? { scale: 0.96 } : undefined}
       animate={selected ? { y: -14 } : { y: 0 }}
       transition={{ type: "spring", stiffness: 260, damping: 22 }}
       className={cn(
-        "relative shrink-0 select-none [perspective:1000px] outline-none",
+        "relative shrink-0 select-none [perspective:800px] outline-none",
         s,
         className,
       )}
     >
       <div
-        className={cn(
-          "relative h-full w-full transition-transform duration-500 [transform-style:preserve-3d]",
-          faceDown ? "" : "[transform:rotateY(180deg)]",
-        )}
+        className="relative h-full w-full [transform-style:preserve-3d]"
+        style={{
+          transform: `rotateX(${tilt.rx}deg) rotateY(${tilt.ry + (faceDown ? 0 : 180)}deg)`,
+          transition: "transform 0.14s ease-out",
+        }}
       >
+        {/* Holographic Glare Sheen */}
+        <div
+          className="pointer-events-none absolute inset-0 z-20 rounded-[inherit] transition-opacity duration-200"
+          style={{
+            opacity: tilt.glare,
+            background: `radial-gradient(circle at ${tilt.gx}% ${tilt.gy}%, rgba(255, 255, 255, 0.45) 0%, rgba(255, 255, 255, 0) 65%)`,
+            mixBlendMode: "overlay",
+          }}
+        />
         {/* Back */}
         <div
           className={cn(
