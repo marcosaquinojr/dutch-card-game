@@ -77,11 +77,17 @@ export function PlayerHand({
               className={cn(
                 "relative group flex flex-col items-center cursor-pointer",
                 swapActive && "ring-2 ring-[color:var(--neon)] ring-offset-2 ring-offset-black/70 rounded-xl shadow-[0_0_15px_rgba(56,189,248,0.4)] animate-pulse",
+                selectedIndex === i && "ring-2 ring-yellow-400 ring-offset-2 ring-offset-black/70 rounded-xl scale-105 shadow-[0_0_20px_rgba(250,204,21,0.8)] z-20",
               )}
               onClick={() => {
                 if (onCardClick) onCardClick(i);
               }}
             >
+              {selectedIndex === i && (
+                <span className="absolute -top-2.5 -right-1 text-[9px] bg-yellow-400 text-black font-extrabold px-1.5 py-0.5 rounded-full shadow-lg z-20 animate-bounce">
+                  1ª Carta 📌
+                </span>
+              )}
               {faceDown && !revealed ? (
                 <CardBack
                   size={size}
@@ -101,12 +107,18 @@ export function PlayerHand({
                 <span
                   className={cn(
                     "mt-1 text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full transition-all",
-                    swapActive
-                      ? "bg-[color:var(--neon)]/20 text-[color:var(--neon)] border border-[color:var(--neon)]/40 font-extrabold"
-                      : "text-white/50 group-hover:text-white/90 bg-black/30",
+                    selectedIndex === i
+                      ? "bg-yellow-400/20 text-yellow-300 border border-yellow-400/40 font-extrabold"
+                      : swapActive
+                        ? "bg-[color:var(--neon)]/20 text-[color:var(--neon)] border border-[color:var(--neon)]/40 font-extrabold"
+                        : "text-white/50 group-hover:text-white/90 bg-black/30",
                   )}
                 >
-                  {swapActive ? `Trocar ${i + 1}` : getPositionName(i, cards.length)}
+                  {selectedIndex === i
+                    ? `Selecionada (${i + 1})`
+                    : swapActive
+                      ? `Trocar ${i + 1}`
+                      : getPositionName(i, cards.length)}
                 </span>
               )}
 

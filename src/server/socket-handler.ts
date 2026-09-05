@@ -563,6 +563,33 @@ export function registerSocketHandlers(io: TypedServer): void {
       }
     });
 
+    // Pular efeito especial (ex: optar por não trocar cartas com o Valete)
+    socket.on('game:skip-effect', () => {
+      const roomData = roomManager.getRoomBySocketId(socket.id);
+      if (!roomData) return;
+      const { room, player } = roomData;
+
+      if (room.pendingEffect && room.pendingEffect.playerId === player.id) {
+        room.pendingEffect = null;
+        const skipMsg: ChatMessage = {
+          id: crypto.randomUUID(),
+          author: 'Sistema',
+          text: `🃏 ${player.name} optou por não trocar cartas com o Valete.`,
+          time: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+          system: true,
+        };
+        io.to(room.code).emit('chat:new', skipMsg);
+
+        GameEngine.nextTurn(room);
+        if (room.phase === 'round-end') {
+          handleRoundEnd(io, room);
+        } else {
+          emitGameStateToAll(io, room);
+          startTurnTimer(io, room);
+        }
+      }
+    });
+
     // Mecânica de Descarte Igual (Snap): qualquer jogador a qualquer momento
     socket.on('game:match-discard', (data) => {
       const roomData = roomManager.getRoomBySocketId(socket.id);

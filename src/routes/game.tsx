@@ -12,6 +12,8 @@ import {
   MessageSquare,
   Send,
   HelpCircle,
+  RefreshCw,
+  X,
 } from "lucide-react";
 import { DutchLogo } from "@/components/dutch/DutchLogo";
 import { PlayerAvatar } from "@/components/dutch/PlayerAvatar";
@@ -55,6 +57,7 @@ function Game() {
     matchDiscard,
     queenPeek,
     jackSwap,
+    skipEffect,
     callDutch,
     syncGame,
   } = useGame();
@@ -65,6 +68,14 @@ function Game() {
   const [showRules, setShowRules] = useState(false);
   const [activeMatchModal, setActiveMatchModal] = useState<any>(null);
 
+  // Estado para troca do Valete na própria mesa (sem modal invasivo)
+  const [jackMode, setJackMode] = useState<"prompt" | "selecting-first" | "selecting-second" | null>(null);
+  const [jackFirstCard, setJackFirstCard] = useState<{
+    playerId: string;
+    cardIndex: number;
+    playerName: string;
+  } | null>(null);
+
   // Reage a efeitos especiais pendentes (Q ou J descartados)
   useEffect(() => {
     if (pendingEffect) {
@@ -72,9 +83,14 @@ function Game() {
         setModalKind("peek");
         toast("Você descartou uma Dama (Q)! Escolha uma carta para espiar.", { icon: "👁️" });
       } else if (pendingEffect.effect === "jack-swap") {
-        setModalKind("swap");
-        toast("Você descartou um Valete (J)! Escolha 2 cartas na mesa para trocar.", { icon: "🃏" });
+        // Para o Valete, não abre modal: pergunta na mesa se deseja trocar
+        setModalKind(null);
+        setJackMode("prompt");
+        setJackFirstCard(null);
       }
+    } else {
+      setJackMode(null);
+      setJackFirstCard(null);
     }
   }, [pendingEffect]);
 
@@ -197,6 +213,32 @@ function Game() {
     }
     callDutch();
     toast.success("Você bateu na mesa e chamou DUTCH! 🚩");
+  };
+
+  const handleCardClickForJack = (targetPlayerId: string, cardIndex: number, targetPlayerName: string) => {
+    if (!jackMode || (jackMode !== "selecting-first" && jackMode !== "selecting-second")) return;
+
+    if (jackMode === "selecting-first") {
+      setJackFirstCard({ playerId: targetPlayerId, cardIndex, playerName: targetPlayerName });
+      setJackMode("selecting-second");
+      toast(`1ª carta escolhida (${targetPlayerName}, posição ${cardIndex + 1}). Agora escolha a 2ª carta! 🎯`);
+    } else if (jackMode === "selecting-second" && jackFirstCard) {
+      if (jackFirstCard.playerId === targetPlayerId && jackFirstCard.cardIndex === cardIndex) {
+        toast.error("Você selecionou a mesma carta! Escolha outra carta diferente para trocar.");
+        return;
+      }
+      jackSwap(jackFirstCard.playerId, jackFirstCard.cardIndex, targetPlayerId, cardIndex);
+      toast.success(`Cartas de ${jackFirstCard.playerName} e ${targetPlayerName} trocadas com sucesso! 🔄`);
+      setJackMode(null);
+      setJackFirstCard(null);
+    }
+  };
+
+  const handleCancelJack = () => {
+    skipEffect();
+    setJackMode(null);
+    setJackFirstCard(null);
+    toast("Efeito do Valete cancelado.", { icon: "⏭️" });
   };
 
   const handleSendMessage = (e: React.FormEvent) => {
@@ -339,10 +381,32 @@ function Game() {
               </div>
 
               {/* Mini grade 2x2 de cartas do oponente */}
-              <div className={cn(p.cardsCount <= 4 ? "grid grid-cols-2 gap-0.5" : "flex -space-x-2", "scale-75 origin-right")}>
-                {Array.from({ length: p.cardsCount }).map((_, cardIdx) => (
-                  <CardBack key={cardIdx} size="sm" />
-                ))}
+              <div className={cn(p.cardsCount <= 4 ? "grid grid-cols-2 gap-1" : "flex -space-x-2", "scale-85 origin-right")}>
+                {Array.from({ length: p.cardsCount }).map((_, cardIdx) => {
+                  const isFirstSelected = jackFirstCard?.playerId === p.id && jackFirstCard?.cardIndex === cardIdx;
+                  const canSelectForJack = (jackMode === "selecting-first" || jackMode === "selecting-second") && !p.isLocked;
+
+                  return (
+                    <div
+                      key={cardIdx}
+                      onClick={canSelectForJack ? () => handleCardClickForJack(p.id, cardIdx, p.name) : undefined}
+                      className={cn(
+                        "relative transition-all rounded-md",
+                        canSelectForJack && "cursor-pointer hover:scale-115 hover:z-20 hover:brightness-125",
+                        canSelectForJack && !isFirstSelected && "ring-1 ring-yellow-400/80 shadow-[0_0_8px_rgba(250,204,21,0.5)] animate-pulse",
+                        isFirstSelected && "ring-2 ring-yellow-400 scale-115 shadow-[0_0_15px_rgba(250,204,21,0.9)] z-20",
+                      )}
+                      title={canSelectForJack ? `Selecionar carta de ${p.name}` : undefined}
+                    >
+                      {isFirstSelected && (
+                        <span className="absolute -top-2 -right-1 text-[8px] bg-yellow-400 text-black font-black px-1 rounded-full shadow z-30 animate-bounce">
+                          1ª
+                        </span>
+                      )}
+                      <CardBack size="sm" />
+                    </div>
+                  );
+                })}
               </div>
             </div>
           ))}
@@ -428,8 +492,81 @@ function Game() {
             </div>
           )}
 
+          {/* Valete (J): Prompt na mesa para escolher se quer trocar cartas */}
+          <AnimatePresence>
+            {jackMode === "prompt" && (
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0, y: -5 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                className="flex flex-col items-center gap-2 p-3 sm:p-4 rounded-2xl bg-yellow-500/15 border-2 border-yellow-400 glow-yellow shadow-2xl backdrop-blur-xl max-w-md text-center mt-3 z-30"
+              >
+                <div className="flex items-center gap-1.5 text-xs sm:text-sm font-black text-yellow-300 uppercase tracking-wider">
+                  <span>🃏</span>
+                  <span>Efeito do Valete Descartado!</span>
+                </div>
+                <p className="text-xs text-white/90">
+                  Você descartou um Valete (J). Deseja trocar a posição de duas cartas quaisquer na mesa?
+                </p>
+                <div className="flex items-center justify-center gap-2.5 pt-1">
+                  <button
+                    onClick={() => {
+                      setJackMode("selecting-first");
+                      setJackFirstCard(null);
+                      toast("Passo 1: Clique na 1ª carta na mesa (sua ou de um oponente)", { icon: "👆" });
+                    }}
+                    className="px-4 py-2 rounded-xl bg-yellow-400 hover:bg-yellow-300 text-black font-extrabold text-xs shadow-lg transition-all cursor-pointer flex items-center gap-1.5"
+                  >
+                    <RefreshCw className="h-3.5 w-3.5" /> Sim, trocar cartas
+                  </button>
+                  <button
+                    onClick={handleCancelJack}
+                    className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs border border-white/20 transition-all cursor-pointer flex items-center gap-1.5"
+                  >
+                    <X className="h-3.5 w-3.5" /> Não, pular efeito
+                  </button>
+                </div>
+              </motion.div>
+            )}
+
+            {(jackMode === "selecting-first" || jackMode === "selecting-second") && (
+              <motion.div
+                initial={{ scale: 0.95, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.95, opacity: 0 }}
+                className="flex flex-col sm:flex-row items-center justify-between gap-3 p-3 rounded-2xl bg-black/80 border-2 border-yellow-400 shadow-2xl backdrop-blur-xl max-w-lg w-full mt-3 z-30"
+              >
+                <div className="flex items-center gap-2.5 text-left">
+                  <span className="grid h-8 w-8 place-items-center rounded-xl bg-yellow-400 text-black font-black text-sm shrink-0 shadow">
+                    {jackMode === "selecting-first" ? "1/2" : "2/2"}
+                  </span>
+                  <div>
+                    <div className="text-xs font-black text-yellow-300 uppercase tracking-wide">
+                      {jackMode === "selecting-first" ? "Passo 1: Escolha a 1ª carta" : "Passo 2: Escolha a 2ª carta"}
+                    </div>
+                    <div className="text-[11px] text-white/80">
+                      {jackMode === "selecting-first" ? (
+                        "Clique em qualquer carta na mesa (sua grade ou de um oponente) 👆"
+                      ) : (
+                        <span>
+                          1ª selecionada: <strong className="text-yellow-300">{jackFirstCard?.playerName} (Carta {(jackFirstCard?.cardIndex ?? 0) + 1})</strong>. Agora clique na 2ª carta para trocar! 🔄
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                <button
+                  onClick={handleCancelJack}
+                  className="shrink-0 px-3 py-1.5 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/40 text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1"
+                >
+                  <X className="h-3 w-3" /> Cancelar
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
           {/* Dica rápida de Snap */}
-          {gameState.discardTop && !isMeLocked && !drawnCard && (
+          {gameState.discardTop && !isMeLocked && !drawnCard && !jackMode && (
             <div className="mt-2 text-[11px] font-bold text-yellow-300/80 flex items-center gap-1 bg-yellow-500/10 px-3 py-1 rounded-full border border-yellow-500/20 backdrop-blur-md">
               <Zap className="h-3 w-3 fill-current" />
               Sabe que tem carta igual a {gameState.discardTop.value}? Clique no raio ⚡ para Snap!
@@ -445,6 +582,16 @@ function Game() {
             </div>
           )}
 
+          {jackMode && (
+            <div className="text-xs font-black uppercase tracking-widest text-yellow-300 animate-pulse flex items-center gap-1 bg-black/80 px-4 py-1.5 rounded-full border border-yellow-400/60 shadow-lg">
+              {jackMode === "prompt"
+                ? "🃏 Responda se deseja usar o poder do Valete acima"
+                : jackMode === "selecting-first"
+                  ? "🃏 Passo 1: Clique na 1ª carta (sua ou de um oponente)"
+                  : "🃏 Passo 2: Clique na 2ª carta para concluir a troca"}
+            </div>
+          )}
+
           <PlayerHand
             cards={gameState.yourHand}
             faceDown
@@ -453,10 +600,13 @@ function Game() {
             layout="grid"
             isLocked={isMeLocked}
             canMatch={!!gameState.discardTop}
-            swapActive={Boolean(drawnCard)}
+            swapActive={Boolean(drawnCard || jackMode === "selecting-first" || jackMode === "selecting-second")}
+            selectedIndex={jackFirstCard?.playerId === me?.id ? jackFirstCard.cardIndex : undefined}
             onCardClick={(index: number) => {
               if (drawnCard) {
                 handleSwapCard(index);
+              } else if (jackMode === "selecting-first" || jackMode === "selecting-second") {
+                handleCardClickForJack(me?.id || "", index, "Você");
               }
             }}
             onMatchClick={handleMatchSnap}
@@ -515,7 +665,7 @@ function Game() {
         yourHand={gameState.yourHand}
         onClose={() => {
           setModalKind(null);
-          setPendingEffect(null);
+          skipEffect();
         }}
         onConfirmPeek={(cardIndex) => {
           queenPeek(cardIndex);

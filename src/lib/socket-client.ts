@@ -316,6 +316,12 @@ export function useGame() {
     if (s) s.emit('game:next-round');
   }, []);
 
+  const skipEffect = useCallback(() => {
+    const s = connectSocket();
+    if (s) s.emit('game:skip-effect');
+    setPendingEffect(null);
+  }, []);
+
   return {
     gameState,
     drawnCard,
@@ -331,6 +337,7 @@ export function useGame() {
     matchDiscard,
     queenPeek,
     jackSwap,
+    skipEffect,
     discardCard,
     swapCard,
     useSpecial,

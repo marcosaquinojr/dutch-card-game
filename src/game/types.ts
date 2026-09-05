@@ -136,6 +136,7 @@ export interface ClientToServerEvents {
   'game:jack-swap': (data: { player1Id: string; cardIndex1: number; player2Id: string; cardIndex2: number }) => void;
   'game:use-special': (data: { kind: 'peek' | 'swap' | 'reveal' | 'steal'; targetPlayerId?: string; targetCardIndex?: number }) => void;
   'game:call-dutch': () => void;
+  'game:skip-effect': () => void;
   'game:next-round': () => void;
   'chat:message': (data: { text: string }) => void;
 }
