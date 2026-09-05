@@ -146,10 +146,8 @@ export class GameEngine {
     player.hand[handIndex] = room.drawnCard;
     room.drawnCard = null;
 
-    // O jogador agora conhece a nova carta colocada na sua grade
-    if (!player.knownCards.includes(handIndex)) {
-      player.knownCards.push(handIndex);
-    }
+    // A carta vai para a grade VIRADA PARA BAIXO na mesa!
+    player.knownCards = player.knownCards.filter((idx) => idx !== handIndex);
 
     room.discardPile.push(oldCard);
 

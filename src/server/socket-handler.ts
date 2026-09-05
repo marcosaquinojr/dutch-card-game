@@ -47,12 +47,11 @@ function checkBotTurn(io: TypedServer, room: GameRoom): void {
     if (room.players[room.currentTurnIndex]?.id !== currentP.id) return;
 
     // 1. Decisão de Bater na Mesa (DUTCH):
-    const knownPoints = currentP.knownCards.reduce((acc, idx) => acc + (currentP.hand[idx]?.points || 0), 0);
+    const totalHandPoints = currentP.hand.reduce((acc, c) => acc + (c?.points || 0), 0);
     const shouldCallDutch =
       room.phase === 'playing' &&
       room.dutchCallerId === null &&
-      currentP.knownCards.length >= 2 &&
-      knownPoints <= 6 &&
+      totalHandPoints <= 6 &&
       Math.random() < 0.75;
 
     if (shouldCallDutch) {
@@ -99,13 +98,12 @@ function checkBotTurn(io: TypedServer, room: GameRoom): void {
       const isGoodCard = drawn.points <= 5; // A, 2, 3, 4, 5, ou Rei Preto (-1)
 
       if (isGoodCard && currentP.hand.length > 0) {
-        // Troca por uma carta desconhecida ou a de maior valor
-        let chosenIdx = currentP.hand.findIndex((_, idx) => !currentP.knownCards.includes(idx));
-        if (chosenIdx === -1) {
-          chosenIdx = currentP.knownCards.reduce(
-            (maxIdx, idx) => (currentP.hand[idx]?.points > currentP.hand[maxIdx]?.points ? idx : maxIdx),
-            0,
-          );
+        // Encontra a carta da mão com maior pontuação para trocar
+        let chosenIdx = 0;
+        for (let i = 1; i < currentP.hand.length; i++) {
+          if (currentP.hand[i].points > currentP.hand[chosenIdx].points) {
+            chosenIdx = i;
+          }
         }
 
         const { effect } = GameEngine.swapDrawnWithHand(room, currentP.id, chosenIdx);

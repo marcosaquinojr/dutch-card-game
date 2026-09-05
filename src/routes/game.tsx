@@ -171,7 +171,7 @@ function Game() {
       return;
     }
     swapDrawnCard(index);
-    toast.success("Carta trocada com sua grade!");
+    toast.success("Carta trocada e colocada virada para baixo na sua grade! 🤫");
   };
 
   const handleMatchSnap = (index: number) => {
