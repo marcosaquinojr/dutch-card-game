@@ -14,6 +14,21 @@ type TypedSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
 
 let socket: TypedSocket | null = null;
 
+export function getPersistentPlayerId(): string {
+  if (typeof window === 'undefined') return 'server';
+  let id = localStorage.getItem('dutch_playerId');
+  if (!id) {
+    id = `p-${crypto.randomUUID().slice(0, 8)}`;
+    localStorage.setItem('dutch_playerId', id);
+  }
+  return id;
+}
+
+let globalRoomState: RoomState | null = null;
+let globalGameState: ClientGameState | null = null;
+const roomListeners = new Set<(state: RoomState | null) => void>();
+const gameListeners = new Set<(state: ClientGameState | null) => void>();
+
 /** Conecta ao servidor Socket.IO (apenas no navegador) */
 export function connectSocket(): TypedSocket | null {
   if (typeof window === 'undefined') return null;
@@ -26,6 +41,24 @@ export function connectSocket(): TypedSocket | null {
 
     socket.on('connect', () => {
       console.log('✅ Conectado ao servidor Socket.IO:', socket?.id);
+      const roomCode = localStorage.getItem('dutch_currentRoomCode') || undefined;
+      socket?.emit('game:sync', {
+        playerId: getPersistentPlayerId(),
+        roomCode,
+      });
+    });
+
+    socket.on('room:state', (data: RoomState) => {
+      globalRoomState = data;
+      if (typeof window !== 'undefined' && data.code) {
+        localStorage.setItem('dutch_currentRoomCode', data.code);
+      }
+      roomListeners.forEach((fn) => fn(data));
+    });
+
+    socket.on('game:state', (data: ClientGameState) => {
+      globalGameState = data;
+      gameListeners.forEach((fn) => fn(data));
     });
 
     socket.on('connect_error', (err) => {
@@ -53,21 +86,23 @@ export function getSocket(): TypedSocket | null {
 
 /** Hook: estado reativo da sala */
 export function useRoom() {
-  const [roomState, setRoomState] = useState<RoomState | null>(null);
+  const [roomState, setRoomState] = useState<RoomState | null>(globalRoomState);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const s = connectSocket();
     if (!s) return;
 
-    const handleRoomState = (data: RoomState) => setRoomState(data);
-    const handleError = (data: { message: string }) => setError(data.message);
+    roomListeners.add(setRoomState);
 
-    s.on('room:state', handleRoomState);
+    const roomCode = typeof window !== 'undefined' ? localStorage.getItem('dutch_currentRoomCode') : null;
+    s.emit('game:sync', { playerId: getPersistentPlayerId(), roomCode: roomCode || undefined });
+
+    const handleError = (data: { message: string }) => setError(data.message);
     s.on('error' as any, handleError);
 
     return () => {
-      s.off('room:state', handleRoomState);
+      roomListeners.delete(setRoomState);
       s.off('error' as any, handleError);
     };
   }, []);
@@ -81,7 +116,12 @@ export function useRoom() {
       password?: string;
     }) => {
       const s = connectSocket();
-      if (s) s.emit('room:create', data);
+      if (s) {
+        s.emit('room:create', {
+          ...data,
+          playerId: getPersistentPlayerId(),
+        });
+      }
     },
     [],
   );
@@ -89,7 +129,12 @@ export function useRoom() {
   const joinRoom = useCallback(
     (data: { code: string; playerName: string; avatar: string; password?: string }) => {
       const s = connectSocket();
-      if (s) s.emit('room:join', data);
+      if (s) {
+        s.emit('room:join', {
+          ...data,
+          playerId: getPersistentPlayerId(),
+        });
+      }
     },
     [],
   );
@@ -97,7 +142,12 @@ export function useRoom() {
   const leaveRoom = useCallback(() => {
     const s = connectSocket();
     if (s) s.emit('room:leave');
+    globalRoomState = null;
+    globalGameState = null;
     setRoomState(null);
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('dutch_currentRoomCode');
+    }
   }, []);
 
   const setReady = useCallback((ready: boolean) => {
@@ -125,36 +175,47 @@ export function useRoom() {
 
 /** Hook: estado reativo do jogo */
 export function useGame() {
-  const [gameState, setGameState] = useState<ClientGameState | null>(null);
-  const [drawnCard, setDrawnCard] = useState<CardModel | null>(null);
+  const [gameState, setGameState] = useState<ClientGameState | null>(globalGameState);
+  const [drawnCard, setDrawnCard] = useState<CardModel | null>(globalGameState?.drawnCard || null);
   const [roundResults, setRoundResults] = useState<any>(null);
   const [gameResults, setGameResults] = useState<any>(null);
 
-  const [pendingEffect, setPendingEffect] = useState<{ effect: 'queen-peek' | 'jack-swap'; cardValue: string } | null>(null);
+  const [pendingEffect, setPendingEffect] = useState<{ effect: 'queen-peek' | 'jack-swap'; cardValue: string } | null>(
+    globalGameState?.pendingEffect || null
+  );
   const [matchResult, setMatchResult] = useState<any>(null);
 
   useEffect(() => {
     const s = connectSocket();
     if (!s) return;
 
-    const handleGameState = (data: ClientGameState) => {
+    const handleUpdate = (data: ClientGameState | null) => {
       setGameState(data);
-      if (data.drawnCard) {
+      if (data?.drawnCard) {
         setDrawnCard(data.drawnCard);
-      } else if (!data.drawnCard) {
+      } else if (data && !data.drawnCard) {
         setDrawnCard(null);
       }
-      if (data.pendingEffect) {
+      if (data?.pendingEffect) {
         setPendingEffect(data.pendingEffect);
       }
     };
+
+    gameListeners.add(handleUpdate);
+
+    // Sincroniza imediatamente com o servidor
+    const roomCode = typeof window !== 'undefined' ? localStorage.getItem('dutch_currentRoomCode') : null;
+    s.emit('game:sync', {
+      playerId: getPersistentPlayerId(),
+      roomCode: roomCode || undefined,
+    });
+
     const handleCardDrawn = (data: { card: CardModel }) => setDrawnCard(data.card);
     const handleRoundEnd = (data: any) => setRoundResults(data);
     const handleGameEnd = (data: any) => setGameResults(data);
     const handleEffectPending = (data: { effect: 'queen-peek' | 'jack-swap'; cardValue: string }) => setPendingEffect(data);
     const handleMatchResult = (data: any) => setMatchResult(data);
 
-    s.on('game:state', handleGameState);
     s.on('game:card-drawn', handleCardDrawn as any);
     s.on('game:round-end', handleRoundEnd);
     s.on('game:end', handleGameEnd);
@@ -162,13 +223,21 @@ export function useGame() {
     s.on('game:match-result', handleMatchResult);
 
     return () => {
-      s.off('game:state', handleGameState);
+      gameListeners.delete(handleUpdate);
       s.off('game:card-drawn', handleCardDrawn as any);
       s.off('game:round-end', handleRoundEnd);
       s.off('game:end', handleGameEnd);
       s.off('game:effect-pending', handleEffectPending);
       s.off('game:match-result', handleMatchResult);
     };
+  }, []);
+
+  const syncGame = useCallback(() => {
+    const s = connectSocket();
+    if (s) {
+      const roomCode = typeof window !== 'undefined' ? localStorage.getItem('dutch_currentRoomCode') : null;
+      s.emit('game:sync', { playerId: getPersistentPlayerId(), roomCode: roomCode || undefined });
+    }
   }, []);
 
   const drawFromDeck = useCallback(() => {
@@ -267,6 +336,7 @@ export function useGame() {
     useSpecial,
     callDutch,
     nextRound,
+    syncGame,
   };
 }
 

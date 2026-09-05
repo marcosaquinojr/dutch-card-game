@@ -117,13 +117,14 @@ export interface ChatMessage {
 
 // Eventos do cliente para o servidor
 export interface ClientToServerEvents {
-  'room:create': (data: { settings: RoomSettings; playerName: string; avatar: string; roomName: string; password?: string }) => void;
-  'room:join': (data: { code: string; playerName: string; avatar: string; password?: string }) => void;
+  'room:create': (data: { settings: RoomSettings; playerName: string; avatar: string; roomName: string; password?: string; playerId?: string }) => void;
+  'room:join': (data: { code: string; playerName: string; avatar: string; password?: string; playerId?: string }) => void;
   'room:leave': () => void;
   'room:ready': (data: { ready: boolean }) => void;
   'room:add-bot': () => void;
   'room:remove-bot': (data: { botId: string }) => void;
   'game:start': () => void;
+  'game:sync': (data?: { playerId?: string; roomCode?: string }) => void;
   'game:draw-deck': () => void;
   'game:draw-discard': () => void;
   'game:discard': (data: { cardIndex: number }) => void;

@@ -219,8 +219,9 @@ export function registerSocketHandlers(io: TypedServer): void {
     // ── Eventos de Sala ──
 
     socket.on('room:create', (data) => {
+      const playerId = data.playerId || socket.id;
       const room = roomManager.createRoom(
-        socket.id,
+        playerId,
         socket.id,
         data.playerName,
         data.avatar,
@@ -230,13 +231,14 @@ export function registerSocketHandlers(io: TypedServer): void {
       );
       socket.join(room.code);
       socket.emit('room:state', GameEngine.getRoomState(room));
-      console.log(`🏠 Sala criada: ${room.code} por ${data.playerName}`);
+      console.log(`🏠 Sala criada: ${room.code} por ${data.playerName} (PlayerID: ${playerId})`);
     });
 
     socket.on('room:join', (data) => {
+      const playerId = data.playerId || socket.id;
       const result = roomManager.joinRoom(
         data.code,
-        socket.id,
+        playerId,
         socket.id,
         data.playerName,
         data.avatar,
@@ -251,7 +253,7 @@ export function registerSocketHandlers(io: TypedServer): void {
       socket.join(result.code);
 
       // Notifica todos sobre o novo jogador
-      const newPlayer = result.players.find((p) => p.id === socket.id);
+      const newPlayer = result.players.find((p) => p.id === playerId || p.socketId === socket.id);
       if (newPlayer) {
         io.to(result.code).emit('player:joined', {
           id: newPlayer.id,
@@ -259,14 +261,42 @@ export function registerSocketHandlers(io: TypedServer): void {
           avatar: newPlayer.avatar,
           isHost: newPlayer.isHost,
           ready: newPlayer.ready,
-          cardsCount: 0,
-          score: 0,
+          isBot: newPlayer.isBot || false,
+          cardsCount: newPlayer.hand.length,
+          score: newPlayer.score,
           connected: true,
+          isLocked: false,
         });
       }
 
       emitRoomStateToAll(io, result);
-      console.log(`👤 ${data.playerName} entrou na sala ${data.code}`);
+      console.log(`👤 ${data.playerName} entrou na sala ${result.code}`);
+    });
+
+    // Sincronização de estado (ao carregar /game ou reconectar)
+    socket.on('game:sync', (data) => {
+      let roomData = roomManager.getRoomBySocketId(socket.id);
+      if (!roomData && data?.playerId) {
+        let room = data.roomCode ? roomManager.getRoom(data.roomCode) : null;
+        if (!room) {
+          const found = roomManager.getRoomByPlayerId(data.playerId);
+          if (found) room = found.room;
+        }
+        if (room) {
+          const player = room.players.find((p) => p.id === data.playerId);
+          if (player) {
+            player.socketId = socket.id;
+            player.connected = true;
+            socket.join(room.code);
+            roomData = { room, player };
+          }
+        }
+      }
+
+      if (roomData) {
+        socket.emit('room:state', GameEngine.getRoomState(roomData.room));
+        socket.emit('game:state', GameEngine.getClientState(roomData.room, roomData.player.id));
+      }
     });
 
     socket.on('room:leave', () => {

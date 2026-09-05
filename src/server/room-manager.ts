@@ -193,6 +193,17 @@ export class RoomManager {
     return null;
   }
 
+  /** Busca sala pelo ID persistente do jogador */
+  getRoomByPlayerId(playerId: string): { room: GameRoom; player: ServerPlayer } | null {
+    for (const room of this.rooms.values()) {
+      const player = room.players.find((p) => p.id === playerId);
+      if (player) {
+        return { room, player };
+      }
+    }
+    return null;
+  }
+
   /** Lista salas públicas disponíveis */
   listPublicRooms(): RoomState[] {
     const publicRooms: RoomState[] = [];

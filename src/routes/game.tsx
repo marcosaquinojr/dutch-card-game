@@ -56,6 +56,7 @@ function Game() {
     queenPeek,
     jackSwap,
     callDutch,
+    syncGame,
   } = useGame();
 
   const { messages, sendMessage } = useChat();
@@ -109,17 +110,29 @@ function Game() {
       <main className="relative min-h-screen grid place-items-center bg-black/80">
         <div className="text-center space-y-4">
           <DutchLogo size="lg" />
-          <p className="text-white/60 animate-pulse">Aguardando início da partida...</p>
-          <Link to="/lobby" className="inline-block text-xs text-[color:var(--neon)] underline">
-            Voltar ao lobby
-          </Link>
+          <p className="text-white/60 animate-pulse">Carregando dados da partida...</p>
+          <div className="flex flex-col items-center gap-3 pt-2">
+            <button
+              onClick={() => syncGame()}
+              className="rounded-full gradient-neon px-6 py-2.5 text-xs font-bold text-black glow-neon hover:scale-105 transition-all"
+            >
+              🔄 Sincronizar Partida
+            </button>
+            <Link to="/lobby" className="inline-block text-xs text-[color:var(--neon)] underline">
+              Voltar ao lobby
+            </Link>
+          </div>
         </div>
       </main>
     );
   }
 
+  const persistentPlayerId = typeof window !== "undefined" ? localStorage.getItem("dutch_playerId") : null;
   const playerName = (typeof window !== "undefined" ? localStorage.getItem("dutch_playerName") : null) || "Você";
-  const me = gameState.players.find((p) => p.name === playerName) || gameState.players[0];
+  const me =
+    (persistentPlayerId && gameState.players.find((p) => p.id === persistentPlayerId)) ||
+    gameState.players.find((p) => p.name === playerName) ||
+    gameState.players[0];
   const isMyTurn = gameState.currentTurnPlayerId === me?.id;
   const isMeLocked = gameState.lockedPlayerIds?.includes(me?.id);
   const activePlayer = gameState.players.find((p) => p.id === gameState.currentTurnPlayerId) || me;
