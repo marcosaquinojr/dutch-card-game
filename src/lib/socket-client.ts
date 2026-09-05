@@ -120,25 +120,44 @@ export function useGame() {
   const [roundResults, setRoundResults] = useState<any>(null);
   const [gameResults, setGameResults] = useState<any>(null);
 
+  const [pendingEffect, setPendingEffect] = useState<{ effect: 'queen-peek' | 'jack-swap'; cardValue: string } | null>(null);
+  const [matchResult, setMatchResult] = useState<any>(null);
+
   useEffect(() => {
     const s = connectSocket();
     if (!s) return;
 
-    const handleGameState = (data: ClientGameState) => setGameState(data);
+    const handleGameState = (data: ClientGameState) => {
+      setGameState(data);
+      if (data.drawnCard) {
+        setDrawnCard(data.drawnCard);
+      } else if (!data.drawnCard) {
+        setDrawnCard(null);
+      }
+      if (data.pendingEffect) {
+        setPendingEffect(data.pendingEffect);
+      }
+    };
     const handleCardDrawn = (data: { card: CardModel }) => setDrawnCard(data.card);
     const handleRoundEnd = (data: any) => setRoundResults(data);
     const handleGameEnd = (data: any) => setGameResults(data);
+    const handleEffectPending = (data: { effect: 'queen-peek' | 'jack-swap'; cardValue: string }) => setPendingEffect(data);
+    const handleMatchResult = (data: any) => setMatchResult(data);
 
     s.on('game:state', handleGameState);
     s.on('game:card-drawn', handleCardDrawn as any);
     s.on('game:round-end', handleRoundEnd);
     s.on('game:end', handleGameEnd);
+    s.on('game:effect-pending', handleEffectPending);
+    s.on('game:match-result', handleMatchResult);
 
     return () => {
       s.off('game:state', handleGameState);
       s.off('game:card-drawn', handleCardDrawn as any);
       s.off('game:round-end', handleRoundEnd);
       s.off('game:end', handleGameEnd);
+      s.off('game:effect-pending', handleEffectPending);
+      s.off('game:match-result', handleMatchResult);
     };
   }, []);
 
@@ -152,15 +171,47 @@ export function useGame() {
     if (s) s.emit('game:draw-discard');
   }, []);
 
+  const discardDrawnCard = useCallback(() => {
+    const s = connectSocket();
+    if (s) s.emit('game:discard-drawn');
+    setDrawnCard(null);
+  }, []);
+
+  const swapDrawnCard = useCallback((handIndex: number) => {
+    const s = connectSocket();
+    if (s) s.emit('game:swap-drawn', { handIndex });
+    setDrawnCard(null);
+  }, []);
+
+  const matchDiscard = useCallback((handIndex: number) => {
+    const s = connectSocket();
+    if (s) s.emit('game:match-discard', { handIndex });
+  }, []);
+
+  const queenPeek = useCallback((cardIndex: number) => {
+    const s = connectSocket();
+    if (s) s.emit('game:queen-peek', { cardIndex });
+    setPendingEffect(null);
+  }, []);
+
+  const jackSwap = useCallback(
+    (player1Id: string, cardIndex1: number, player2Id: string, cardIndex2: number) => {
+      const s = connectSocket();
+      if (s) s.emit('game:jack-swap', { player1Id, cardIndex1, player2Id, cardIndex2 });
+      setPendingEffect(null);
+    },
+    [],
+  );
+
   const discardCard = useCallback((cardIndex: number) => {
     const s = connectSocket();
-    if (s) s.emit('game:discard', { cardIndex });
+    if (s) s.emit('game:discard-drawn');
     setDrawnCard(null);
   }, []);
 
   const swapCard = useCallback((handIndex: number) => {
     const s = connectSocket();
-    if (s) s.emit('game:swap', { handIndex });
+    if (s) s.emit('game:swap-drawn', { handIndex });
     setDrawnCard(null);
   }, []);
 
@@ -189,10 +240,18 @@ export function useGame() {
   return {
     gameState,
     drawnCard,
+    pendingEffect,
+    setPendingEffect,
+    matchResult,
     roundResults,
     gameResults,
     drawFromDeck,
     drawFromDiscard,
+    discardDrawnCard,
+    swapDrawnCard,
+    matchDiscard,
+    queenPeek,
+    jackSwap,
     discardCard,
     swapCard,
     useSpecial,

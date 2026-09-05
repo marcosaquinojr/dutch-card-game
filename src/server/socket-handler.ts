@@ -236,29 +236,73 @@ export function registerSocketHandlers(io: TypedServer): void {
       socket.emit('error', { message: 'Não é possível comprar do descarte nesta regra. Compre apenas do Monte.' });
     });
 
-    socket.on('game:discard', (data) => {
+    // Descarta a carta que acabou de comprar do monte
+    socket.on('game:discard-drawn', () => {
       const roomData = roomManager.getRoomBySocketId(socket.id);
       if (!roomData) return;
       const { room, player } = roomData;
 
       if (!GameEngine.isPlayerTurn(room, player.id)) return;
 
-      // O jogador descarta a carta que comprou (precisa ter comprado antes)
-      // Nota: em uma implementação mais robusta, rastrearíamos a carta comprada
-      // Por ora, descartamos do índice da mão
-      const card = player.hand[data.cardIndex];
-      if (card) {
-        GameEngine.discardDrawnCard(room, player.id, card);
-      }
+      const { card, effect } = GameEngine.discardDrawnCard(room, player.id);
+      if (!card) return;
 
-      GameEngine.nextTurn(room);
       clearTurnTimer(room);
 
-      if (room.phase === 'round-end') {
-        handleRoundEnd(io, room);
-      } else {
+      if (effect === 'queen-peek') {
+        socket.emit('game:effect-pending', { effect: 'queen-peek', cardValue: 'Q' });
         emitGameStateToAll(io, room);
-        startTurnTimer(io, room);
+      } else if (effect === 'jack-swap') {
+        socket.emit('game:effect-pending', { effect: 'jack-swap', cardValue: 'J' });
+        emitGameStateToAll(io, room);
+      } else {
+        GameEngine.nextTurn(room);
+        if (room.phase === 'round-end') {
+          handleRoundEnd(io, room);
+        } else {
+          emitGameStateToAll(io, room);
+          startTurnTimer(io, room);
+        }
+      }
+    });
+
+    // Troca a carta comprada com uma da grade na mão
+    socket.on('game:swap-drawn', (data) => {
+      const roomData = roomManager.getRoomBySocketId(socket.id);
+      if (!roomData) return;
+      const { room, player } = roomData;
+
+      if (!GameEngine.isPlayerTurn(room, player.id)) return;
+
+      const { oldCard, effect } = GameEngine.swapDrawnWithHand(room, player.id, data.handIndex);
+      if (!oldCard) return;
+
+      clearTurnTimer(room);
+
+      if (effect === 'queen-peek') {
+        socket.emit('game:effect-pending', { effect: 'queen-peek', cardValue: 'Q' });
+        emitGameStateToAll(io, room);
+      } else if (effect === 'jack-swap') {
+        socket.emit('game:effect-pending', { effect: 'jack-swap', cardValue: 'J' });
+        emitGameStateToAll(io, room);
+      } else {
+        GameEngine.nextTurn(room);
+        if (room.phase === 'round-end') {
+          handleRoundEnd(io, room);
+        } else {
+          emitGameStateToAll(io, room);
+          startTurnTimer(io, room);
+        }
+      }
+    });
+
+    // Compatibilidade com eventos antigos de discard e swap
+    socket.on('game:discard', () => {
+      const roomData = roomManager.getRoomBySocketId(socket.id);
+      if (!roomData) return;
+      const { room, player } = roomData;
+      if (room.drawnCard) {
+        socket.emit('game:discard-drawn' as any);
       }
     });
 
@@ -266,19 +310,42 @@ export function registerSocketHandlers(io: TypedServer): void {
       const roomData = roomManager.getRoomBySocketId(socket.id);
       if (!roomData) return;
       const { room, player } = roomData;
-
-      if (!GameEngine.isPlayerTurn(room, player.id)) return;
-
-      // Nota: precisaríamos rastrear a carta comprada para o swap completo
-      // Simplificação: usamos a última carta comprada
-      const drawnCard = room.discardPile[room.discardPile.length - 1];
-      if (drawnCard) {
-        GameEngine.swapWithHand(room, player.id, data.handIndex, drawnCard);
+      if (room.drawnCard) {
+        const { oldCard, effect } = GameEngine.swapDrawnWithHand(room, player.id, data.handIndex);
+        if (!oldCard) return;
+        clearTurnTimer(room);
+        if (effect) {
+          socket.emit('game:effect-pending', { effect, cardValue: effect === 'queen-peek' ? 'Q' : 'J' });
+          emitGameStateToAll(io, room);
+        } else {
+          GameEngine.nextTurn(room);
+          if (room.phase === 'round-end') {
+            handleRoundEnd(io, room);
+          } else {
+            emitGameStateToAll(io, room);
+            startTurnTimer(io, room);
+          }
+        }
       }
+    });
 
+    // Habilidade da Dama: espiar uma de suas próprias cartas
+    socket.on('game:queen-peek', (data) => {
+      const roomData = roomManager.getRoomBySocketId(socket.id);
+      if (!roomData) return;
+      const { room, player } = roomData;
+
+      const result = GameEngine.queenPeek(room, player.id, data.cardIndex);
+      socket.emit('game:special-result', {
+        kind: 'peek',
+        card: result.card,
+        success: result.success,
+      });
+
+      emitGameStateToAll(io, room);
+
+      // Avança o turno após resolver o efeito da Dama
       GameEngine.nextTurn(room);
-      clearTurnTimer(room);
-
       if (room.phase === 'round-end') {
         handleRoundEnd(io, room);
       } else {
@@ -287,33 +354,81 @@ export function registerSocketHandlers(io: TypedServer): void {
       }
     });
 
-    socket.on('game:use-special', (data) => {
+    // Habilidade do Valete: trocar quaisquer 2 cartas na mesa
+    socket.on('game:jack-swap', (data) => {
       const roomData = roomManager.getRoomBySocketId(socket.id);
       if (!roomData) return;
       const { room, player } = roomData;
 
-      const result = GameEngine.useSpecial(
+      const result = GameEngine.jackSwap(
         room,
         player.id,
-        data.kind,
-        data.targetPlayerId,
-        data.targetCardIndex,
+        data.player1Id,
+        data.cardIndex1,
+        data.player2Id,
+        data.cardIndex2,
       );
-      socket.emit('game:special-result', {
-        kind: data.kind,
-        card: result.card,
-        success: result.success,
-      });
-      emitGameStateToAll(io, room);
 
-      // Se foi espiada ('peek'), atualiza novamente após 5.2 segundos para virar para baixo
-      if (data.kind === 'peek') {
-        setTimeout(() => {
-          emitGameStateToAll(io, room);
-        }, 5200);
+      if (!result.success) {
+        socket.emit('error', { message: result.message || 'Troca não permitida' });
+        return;
+      }
+
+      const p1 = room.players.find((p) => p.id === data.player1Id);
+      const p2 = room.players.find((p) => p.id === data.player2Id);
+
+      const swapMessage: ChatMessage = {
+        id: crypto.randomUUID(),
+        author: 'Sistema',
+        text: `🃏 ${player.name} usou o Valete para trocar uma carta de ${p1?.name} com ${p2?.name}!`,
+        time: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+        system: true,
+      };
+      io.to(room.code).emit('chat:new', swapMessage);
+
+      // Avança o turno após resolver o Valete
+      GameEngine.nextTurn(room);
+      if (room.phase === 'round-end') {
+        handleRoundEnd(io, room);
+      } else {
+        emitGameStateToAll(io, room);
+        startTurnTimer(io, room);
       }
     });
 
+    // Mecânica de Descarte Igual (Snap): qualquer jogador a qualquer momento
+    socket.on('game:match-discard', (data) => {
+      const roomData = roomManager.getRoomBySocketId(socket.id);
+      if (!roomData) return;
+      const { room, player } = roomData;
+
+      if (room.phase !== 'playing' && room.phase !== 'dutch-called') return;
+
+      const result = GameEngine.matchDiscard(room, player.id, data.handIndex);
+
+      io.to(room.code).emit('game:match-result', {
+        playerId: player.id,
+        playerName: player.name,
+        success: result.success,
+        message: result.message,
+        card: result.card,
+      });
+
+      const matchMsg: ChatMessage = {
+        id: crypto.randomUUID(),
+        author: 'Sistema',
+        text: result.success
+          ? `⚡ ${player.name} ACERTOU o descarte igual (${result.card?.value}) e agora tem ${result.newCount} carta(s)!`
+          : `❌ ${player.name} ERROU o descarte igual e recebeu +1 carta de penalidade!`,
+        time: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+        system: true,
+      };
+      io.to(room.code).emit('chat:new', matchMsg);
+
+      emitGameStateToAll(io, room);
+    });
+
+    // Bater na mesa / chamar Dutch
     socket.on('game:call-dutch', () => {
       const roomData = roomManager.getRoomBySocketId(socket.id);
       if (!roomData) return;
@@ -325,10 +440,26 @@ export function registerSocketHandlers(io: TypedServer): void {
           playerId: player.id,
           playerName: player.name,
         });
-        emitGameStateToAll(io, room);
+
+        const dutchMsg: ChatMessage = {
+          id: crypto.randomUUID(),
+          author: 'Sistema',
+          text: `🚩 ${player.name} BATEU NA MESA E CHAMOU DUTCH! As cartas dele estão travadas 🔒. Todos os outros têm 1 último turno!`,
+          time: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+          system: true,
+        };
+        io.to(room.code).emit('chat:new', dutchMsg);
+
+        clearTurnTimer(room);
+        if (room.phase === 'round-end') {
+          handleRoundEnd(io, room);
+        } else {
+          emitGameStateToAll(io, room);
+          startTurnTimer(io, room);
+        }
         console.log(`🚩 ${player.name} chamou DUTCH na sala ${room.code}!`);
       } else {
-        socket.emit('error', { message: 'Não é possível chamar Dutch agora' });
+        socket.emit('error', { message: 'Você só pode chamar Dutch no seu turno e antes de comprar carta!' });
       }
     });
 

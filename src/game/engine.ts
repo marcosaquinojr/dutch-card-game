@@ -3,231 +3,353 @@ import { createDeck, shuffleDeck, dealCards } from './deck';
 
 export class GameEngine {
   /**
-   * No Dutch clássico, o jogador olha 2 de suas cartas no início por 5s
+   * No Dutch clássico, o jogador olha 2 de suas 4 cartas no início por 5s.
+   * Por padrão, olha as duas cartas da frente/baixo (índices 2 e 3 em grade 2x2, ou 0 e 1).
    */
-  static getInitialVisibleCount(cardsPerPlayer: number): number {
-    return 2;
+  static getInitialVisibleIndices(cardsPerPlayer: number): number[] {
+    if (cardsPerPlayer >= 4) {
+      return [2, 3]; // As duas cartas inferiores da grade 2x2
+    }
+    return [0, 1];
   }
 
   /**
-   * Inicia uma nova rodada: embaralha, distribui, define fase 'memorize'
+   * Inicia uma nova rodada: embaralha, distribui 4 cartas em grade, define fase 'memorize'
    */
   static startRound(room: GameRoom): void {
     const deck = shuffleDeck(createDeck(room.settings.specialCards));
-    const { hands, remainingDeck } = dealCards(deck, room.players.length, room.settings.cardsPerPlayer);
-    
+    const cardsPerPlayer = room.settings.cardsPerPlayer || 4;
+    const { hands, remainingDeck } = dealCards(deck, room.players.length, cardsPerPlayer);
+
     room.deck = remainingDeck;
-    
-    // Configura primeira carta no descarte
+
+    // Configura primeira carta no topo do monte de descarte
     const firstDiscard = room.deck.pop();
     if (firstDiscard) {
       room.discardPile = [firstDiscard];
     }
-    
-    const visibleCount = this.getInitialVisibleCount(room.settings.cardsPerPlayer);
-    const visibleIndices = Array.from({ length: visibleCount }, (_, i) => i);
-    
+
+    const initialVisible = this.getInitialVisibleIndices(cardsPerPlayer);
+
     room.players.forEach((player, i) => {
       player.hand = hands[i];
-      player.knownCards = [...visibleIndices];
+      player.knownCards = [...initialVisible];
     });
-    
+
     room.phase = 'memorize';
     room.dutchCallerId = null;
+    room.drawnCard = null;
+    room.lockedPlayerIds = [];
+    room.pendingEffect = null;
     room.round += 1;
-    room.currentTurnIndex = (room.round - 1) % room.players.length; // O primeiro jogador alterna a cada rodada
+    room.currentTurnIndex = (room.round - 1) % room.players.length;
   }
-  
+
   /**
    * Transição memorize -> playing após timeout de 5 segundos.
-   * As cartas vistas inicialmente são viradas de volta para baixo (knownCards = []).
+   * As cartas vistas inicialmente são viradas de volta para baixo.
    */
   static endMemorize(room: GameRoom): void {
     if (room.phase === 'memorize') {
       room.phase = 'playing';
       room.turnStartedAt = Date.now();
-      // Virar todas as cartas de volta para baixo
       room.players.forEach((p) => {
         p.knownCards = [];
       });
     }
   }
-  
+
   /**
    * Verifica se é o turno do jogador
    */
   static isPlayerTurn(room: GameRoom, playerId: string): boolean {
     return room.players[room.currentTurnIndex]?.id === playerId;
   }
-  
+
   /**
    * Jogador compra carta do monte. Retorna a carta comprada.
    */
   static drawFromDeck(room: GameRoom, playerId: string): CardModel | null {
     if (!this.isPlayerTurn(room, playerId)) return null;
     if (room.phase !== 'playing' && room.phase !== 'dutch-called') return null;
-    
-    const card = room.deck.pop();
+    if (room.drawnCard) return room.drawnCard; // já comprou
+
+    let card = room.deck.pop();
     if (!card && room.discardPile.length > 1) {
       // Re-embaralha o descarte (menos o topo) se o baralho acabar
       const topDiscard = room.discardPile.pop()!;
       room.deck = shuffleDeck([...room.discardPile]);
       room.discardPile = [topDiscard];
-      return room.deck.pop() || null;
+      card = room.deck.pop();
     }
-    
+
+    if (card) {
+      room.drawnCard = card;
+    }
+
     return card || null;
   }
-  
+
   /**
-   * Cartas descartadas são perdidas — não é possível comprar do descarte.
+   * Cartas descartadas são permanentes — não é possível comprar do descarte.
    */
   static drawFromDiscard(room: GameRoom, playerId: string): CardModel | null {
     return null;
   }
-  
+
   /**
-   * Jogador descarta a carta que acabou de comprar
+   * Descarta a carta que acabou de comprar do monte.
+   * Verifica se ativa efeito de descarte especial:
+   * - Dama (Q) -> espiar carta própria
+   * - Valete (J) -> trocar 2 cartas na mesa
    */
-  static discardDrawnCard(room: GameRoom, playerId: string, drawnCard: CardModel): void {
-    if (!this.isPlayerTurn(room, playerId)) return;
-    room.discardPile.push(drawnCard);
+  static discardDrawnCard(room: GameRoom, playerId: string): {
+    card: CardModel | null;
+    effect: 'queen-peek' | 'jack-swap' | null;
+  } {
+    if (!this.isPlayerTurn(room, playerId)) return { card: null, effect: null };
+    if (!room.drawnCard) return { card: null, effect: null };
+
+    const card = room.drawnCard;
+    room.drawnCard = null;
+    room.discardPile.push(card);
+
+    let effect: 'queen-peek' | 'jack-swap' | null = null;
+    if (card.value === 'Q') {
+      effect = 'queen-peek';
+      room.pendingEffect = { effect: 'queen-peek', playerId };
+    } else if (card.value === 'J') {
+      effect = 'jack-swap';
+      room.pendingEffect = { effect: 'jack-swap', playerId };
+    }
+
+    return { card, effect };
   }
-  
+
   /**
-   * Jogador troca carta da mão pela que comprou
+   * Troca a carta comprada por uma carta da mão na grade.
+   * A carta antiga vai para o topo do descarte e pode ativar efeito especial (Q ou J).
    */
-  static swapWithHand(room: GameRoom, playerId: string, handIndex: number, drawnCard: CardModel): CardModel {
-    const player = room.players.find(p => p.id === playerId);
-    if (!player) throw new Error("Jogador não encontrado");
-    
+  static swapDrawnWithHand(room: GameRoom, playerId: string, handIndex: number): {
+    oldCard: CardModel | null;
+    effect: 'queen-peek' | 'jack-swap' | null;
+  } {
+    if (!this.isPlayerTurn(room, playerId)) return { oldCard: null, effect: null };
+    if (!room.drawnCard) return { oldCard: null, effect: null };
+
+    const player = room.players.find((p) => p.id === playerId);
+    if (!player || handIndex < 0 || handIndex >= player.hand.length) {
+      return { oldCard: null, effect: null };
+    }
+
     const oldCard = player.hand[handIndex];
-    player.hand[handIndex] = drawnCard;
-    
-    // A carta no índice agora é conhecida pelo jogador
+    player.hand[handIndex] = room.drawnCard;
+    room.drawnCard = null;
+
+    // O jogador agora conhece a nova carta colocada na sua grade
     if (!player.knownCards.includes(handIndex)) {
       player.knownCards.push(handIndex);
     }
-    
+
     room.discardPile.push(oldCard);
-    return oldCard;
+
+    let effect: 'queen-peek' | 'jack-swap' | null = null;
+    if (oldCard.value === 'Q') {
+      effect = 'queen-peek';
+      room.pendingEffect = { effect: 'queen-peek', playerId };
+    } else if (oldCard.value === 'J') {
+      effect = 'jack-swap';
+      room.pendingEffect = { effect: 'jack-swap', playerId };
+    }
+
+    return { oldCard, effect };
   }
-  
+
   /**
-   * Usa habilidade especial. Retorna a carta afetada se aplicável
+   * Habilidade da Dama (Rainha): espiar uma de suas próprias cartas viradas para baixo.
+   * Fica visível para o jogador por 5 segundos e depois vira de volta.
    */
-  static useSpecial(room: GameRoom, playerId: string, kind: string, targetPlayerId?: string, targetCardIndex?: number): { success: boolean; card?: CardModel } {
-    if (!this.isPlayerTurn(room, playerId)) return { success: false };
-    const player = room.players.find(p => p.id === playerId);
-    if (!player) return { success: false };
+  static queenPeek(room: GameRoom, playerId: string, cardIndex: number): {
+    success: boolean;
+    card?: CardModel;
+  } {
+    const player = room.players.find((p) => p.id === playerId);
+    if (!player || cardIndex < 0 || cardIndex >= player.hand.length) {
+      return { success: false };
+    }
 
-    switch (kind) {
-      case 'peek': {
-        // Olhar uma de suas próprias cartas (fica visível por 5 segundos)
-        if (targetCardIndex === undefined || targetCardIndex < 0 || targetCardIndex >= player.hand.length) {
-          return { success: false };
-        }
-        if (!player.knownCards.includes(targetCardIndex)) {
-          player.knownCards.push(targetCardIndex);
-        }
-        // Vira a carta de volta para baixo após 5 segundos
-        setTimeout(() => {
-          const idx = player.knownCards.indexOf(targetCardIndex);
-          if (idx !== -1) {
-            player.knownCards.splice(idx, 1);
-          }
-        }, 5000);
-        return { success: true, card: player.hand[targetCardIndex] };
+    if (!player.knownCards.includes(cardIndex)) {
+      player.knownCards.push(cardIndex);
+    }
+
+    setTimeout(() => {
+      const idx = player.knownCards.indexOf(cardIndex);
+      if (idx !== -1) {
+        player.knownCards.splice(idx, 1);
+      }
+    }, 5000);
+
+    room.pendingEffect = null;
+    return { success: true, card: player.hand[cardIndex] };
+  }
+
+  /**
+   * Habilidade do Valete: trocar quaisquer 2 cartas que estejam na mesa
+   * (seja uma sua com a de outro jogador, ou entre dois outros jogadores).
+   * REGRA IMPORTANTE: cartas de quem já bateu (chamou Dutch) estão TRAVADAS e não podem ser trocadas!
+   */
+  static jackSwap(
+    room: GameRoom,
+    playerId: string,
+    p1Id: string,
+    cardIndex1: number,
+    p2Id: string,
+    cardIndex2: number,
+  ): { success: boolean; message?: string } {
+    // Valida se algum dos jogadores envolvidos na troca está com a mão travada
+    if (room.lockedPlayerIds.includes(p1Id) || room.lockedPlayerIds.includes(p2Id)) {
+      return { success: false, message: 'Cartas de quem chamou Dutch estão travadas e não podem ser trocadas!' };
+    }
+
+    const player1 = room.players.find((p) => p.id === p1Id);
+    const player2 = room.players.find((p) => p.id === p2Id);
+
+    if (!player1 || !player2) return { success: false, message: 'Jogadores não encontrados' };
+    if (cardIndex1 < 0 || cardIndex1 >= player1.hand.length) return { success: false, message: 'Índice da carta 1 inválido' };
+    if (cardIndex2 < 0 || cardIndex2 >= player2.hand.length) return { success: false, message: 'Índice da carta 2 inválido' };
+
+    // Realiza a troca física das duas cartas
+    const temp = player1.hand[cardIndex1];
+    player1.hand[cardIndex1] = player2.hand[cardIndex2];
+    player2.hand[cardIndex2] = temp;
+
+    // Reseta conhecimento do índice se for de jogadores diferentes (já que as cartas mudaram)
+    if (p1Id !== p2Id) {
+      player1.knownCards = player1.knownCards.filter((i) => i !== cardIndex1);
+      player2.knownCards = player2.knownCards.filter((i) => i !== cardIndex2);
+    }
+
+    room.pendingEffect = null;
+    return { success: true };
+  }
+
+  /**
+   * Mecânica de Descarte Igual (Snap):
+   * Se um jogador sabe que tem uma carta virada para baixo igual ao topo do descarte,
+   * ele pode descartá-la sobre ela a qualquer momento (mesmo fora do seu turno!).
+   * - Se ACERTAR: a carta é removida da mão (o jogador passa a ter menos cartas!).
+   * - Se ERRAR: penalidade! Mantém a carta e recebe +1 carta extra do monte.
+   */
+  static matchDiscard(
+    room: GameRoom,
+    playerId: string,
+    handIndex: number,
+  ): {
+    success: boolean;
+    card?: CardModel;
+    penaltyCard?: CardModel;
+    message: string;
+    newCount: number;
+  } {
+    const player = room.players.find((p) => p.id === playerId);
+    if (!player || handIndex < 0 || handIndex >= player.hand.length) {
+      return { success: false, message: 'Carta inválida', newCount: player?.hand.length || 0 };
+    }
+
+    const topDiscard = room.discardPile[room.discardPile.length - 1];
+    if (!topDiscard) {
+      return { success: false, message: 'Não há carta no descarte para parear', newCount: player.hand.length };
+    }
+
+    const card = player.hand[handIndex];
+
+    if (card.value === topDiscard.value) {
+      // ACERTOU! Remove a carta da mão e descarta
+      player.hand.splice(handIndex, 1);
+      room.discardPile.push(card);
+
+      // Ajusta os índices conhecidos
+      player.knownCards = player.knownCards
+        .filter((idx) => idx !== handIndex)
+        .map((idx) => (idx > handIndex ? idx - 1 : idx));
+
+      return {
+        success: true,
+        card,
+        message: `Acertou o par! Descartou ${card.value}${card.suit} e agora tem ${player.hand.length} cartas.`,
+        newCount: player.hand.length,
+      };
+    } else {
+      // ERROU! Penalidade: compra +1 carta do monte
+      let penaltyCard = room.deck.pop();
+      if (!penaltyCard && room.discardPile.length > 1) {
+        const top = room.discardPile.pop()!;
+        room.deck = shuffleDeck([...room.discardPile]);
+        room.discardPile = [top];
+        penaltyCard = room.deck.pop();
       }
 
-      case 'swap': {
-        // Trocar uma carta sua com a carta de outro jogador
-        const target = room.players.find(p => p.id === targetPlayerId);
-        if (!target || targetCardIndex === undefined) return { success: false };
-        // Precisa de dois índices: o do jogador e o do alvo
-        // Usamos targetCardIndex para a carta do alvo, e o jogador escolhe a sua depois
-        // Simplificação: troca carta 0 do jogador com targetCardIndex do alvo
-        const playerCardIdx = 0; // Em uma implementação real, seria um parâmetro adicional
-        const tempCard = player.hand[playerCardIdx];
-        player.hand[playerCardIdx] = target.hand[targetCardIndex];
-        target.hand[targetCardIndex] = tempCard;
-        // Atualiza conhecimento: ambos agora conhecem a carta recebida
-        if (!player.knownCards.includes(playerCardIdx)) {
-          player.knownCards.push(playerCardIdx);
-        }
-        return { success: true, card: player.hand[playerCardIdx] };
+      if (penaltyCard) {
+        player.hand.push(penaltyCard);
       }
 
-      case 'reveal': {
-        // Ver uma carta de outro jogador (sem trocar)
-        const targetPlayer = room.players.find(p => p.id === targetPlayerId);
-        if (!targetPlayer || targetCardIndex === undefined) return { success: false };
-        if (targetCardIndex < 0 || targetCardIndex >= targetPlayer.hand.length) {
-          return { success: false };
-        }
-        return { success: true, card: targetPlayer.hand[targetCardIndex] };
-      }
-
-      case 'steal': {
-        // Roubar uma carta de outro jogador e dar uma sua
-        const victim = room.players.find(p => p.id === targetPlayerId);
-        if (!victim || targetCardIndex === undefined) return { success: false };
-        if (targetCardIndex < 0 || targetCardIndex >= victim.hand.length) {
-          return { success: false };
-        }
-        // Rouba a carta do alvo e dá a última carta da própria mão
-        const stolenCard = victim.hand[targetCardIndex];
-        const givenCard = player.hand[player.hand.length - 1];
-        victim.hand[targetCardIndex] = givenCard;
-        player.hand[player.hand.length - 1] = stolenCard;
-        // Jogador agora conhece a carta roubada
-        if (!player.knownCards.includes(player.hand.length - 1)) {
-          player.knownCards.push(player.hand.length - 1);
-        }
-        return { success: true, card: stolenCard };
-      }
-
-      default:
-        return { success: false };
+      return {
+        success: false,
+        card,
+        penaltyCard,
+        message: `Errou! A carta era ${card.value}${card.suit} e o descarte é ${topDiscard.value}. Recebeu +1 carta de penalidade.`,
+        newCount: player.hand.length,
+      };
     }
   }
-  
+
   /**
-   * Jogador chama Dutch
+   * Jogador bate na mesa / chama Dutch em vez de comprar uma carta.
+   * Suas cartas ficam TRAVADAS (não podem ser trocadas por Valete).
+   * Todos os outros jogadores têm exatamente mais um turno.
    */
   static callDutch(room: GameRoom, playerId: string): boolean {
     if (!this.isPlayerTurn(room, playerId)) return false;
     if (room.phase !== 'playing') return false;
     if (room.dutchCallerId !== null) return false;
-    
+    if (room.drawnCard !== null) return false; // Deve bater em vez de comprar
+
     room.phase = 'dutch-called';
     room.dutchCallerId = playerId;
-    
+    if (!room.lockedPlayerIds.includes(playerId)) {
+      room.lockedPlayerIds.push(playerId);
+    }
+
+    // Avança para o próximo jogador imediatamente
+    this.nextTurn(room);
     return true;
   }
-  
+
   /**
    * Avança para o próximo turno
    */
   static nextTurn(room: GameRoom): void {
+    room.drawnCard = null;
+    room.pendingEffect = null;
     room.currentTurnIndex = (room.currentTurnIndex + 1) % room.players.length;
     room.turnStartedAt = Date.now();
-    
+
     if (room.phase === 'dutch-called') {
       const currentPlayer = room.players[room.currentTurnIndex];
       if (currentPlayer.id === room.dutchCallerId) {
-        // A volta completou, acaba a rodada
+        // Todos já jogaram sua última rodada! Acaba a rodada.
         room.phase = 'round-end';
       }
     }
   }
-  
+
   /**
    * Retorna o estado do jogo personalizado para um jogador específico
    * CRÍTICO: não revelar cartas secretas de outros jogadores
    */
   static getClientState(room: GameRoom, playerId: string): ClientGameState {
-    const player = room.players.find(p => p.id === playerId);
+    const player = room.players.find((p) => p.id === playerId);
+    const isTurn = room.players[room.currentTurnIndex]?.id === playerId;
 
     // Calcula tempo restante real do turno
     let turnTimeRemaining = room.settings.turnTimeSeconds;
@@ -237,18 +359,19 @@ export class GameEngine {
     }
 
     // Monta a mão do jogador, escondendo cartas desconhecidas
-    const yourHand = player ? player.hand.map((card, idx) => {
-      if (player.knownCards.includes(idx) || room.phase === 'round-end' || room.phase === 'game-end') {
-        return card; // Carta conhecida ou rodada acabou — revela
-      }
-      // Carta escondida — envia apenas o ID para referência, sem valor real
-      return {
-        id: card.id,
-        value: '?' as any,
-        suit: '?' as any,
-        points: 0,
-      } as CardModel;
-    }) : [];
+    const yourHand = player
+      ? player.hand.map((card, idx) => {
+          if (player.knownCards.includes(idx) || room.phase === 'round-end' || room.phase === 'game-end') {
+            return card;
+          }
+          return {
+            id: card.id,
+            value: '?' as any,
+            suit: '?' as any,
+            points: 0,
+          } as CardModel;
+        })
+      : [];
 
     return {
       phase: room.phase,
@@ -256,9 +379,15 @@ export class GameEngine {
       turnTimeRemaining,
       deckCount: room.deck.length,
       discardTop: room.discardPile.length > 0 ? room.discardPile[room.discardPile.length - 1] : null,
+      drawnCard: isTurn ? room.drawnCard : null,
+      lockedPlayerIds: room.lockedPlayerIds || [],
+      pendingEffect:
+        room.pendingEffect && room.pendingEffect.playerId === playerId
+          ? { effect: room.pendingEffect.effect, cardValue: room.pendingEffect.effect === 'queen-peek' ? 'Q' : 'J' }
+          : null,
       dutchCallerId: room.dutchCallerId,
       round: room.round,
-      players: room.players.map(p => ({
+      players: room.players.map((p) => ({
         id: p.id,
         name: p.name,
         avatar: p.avatar,
@@ -267,12 +396,13 @@ export class GameEngine {
         cardsCount: p.hand.length,
         score: p.score,
         connected: p.connected,
+        isLocked: room.lockedPlayerIds?.includes(p.id) || false,
       })),
       yourHand,
       yourKnownCards: player?.knownCards || [],
     };
   }
-  
+
   /**
    * Retorna o estado da sala (lobby)
    */
@@ -283,7 +413,7 @@ export class GameEngine {
       hostId: room.hostId,
       hasPassword: !!room.password,
       settings: room.settings,
-      players: room.players.map(p => ({
+      players: room.players.map((p) => ({
         id: p.id,
         name: p.name,
         avatar: p.avatar,
@@ -291,9 +421,10 @@ export class GameEngine {
         ready: p.ready,
         cardsCount: p.hand.length,
         score: p.score,
-        connected: p.connected
+        connected: p.connected,
+        isLocked: room.lockedPlayerIds?.includes(p.id) || false,
       })),
-      phase: room.phase
+      phase: room.phase,
     };
   }
 }

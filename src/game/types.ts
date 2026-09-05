@@ -45,6 +45,9 @@ export interface GameRoom {
   phase: GamePhase;
   deck: CardModel[];          // cartas restantes no monte de compras
   discardPile: CardModel[];   // monte de descarte (última = topo)
+  drawnCard: CardModel | null; // carta comprada no turno atual
+  lockedPlayerIds: string[];  // jogadores com cartas travadas (chamaram Dutch)
+  pendingEffect?: { effect: 'queen-peek' | 'jack-swap'; playerId: string } | null;
   currentTurnIndex: number;   // índice no array de jogadores
   dutchCallerId: string | null;
   round: number;
@@ -63,6 +66,7 @@ export interface ClientPlayer {
   cardsCount: number;         // quantas cartas eles têm
   score: number;
   connected: boolean;
+  isLocked?: boolean;         // se chamou Dutch e está travado
 }
 
 export interface ClientGameState {
@@ -71,6 +75,9 @@ export interface ClientGameState {
   turnTimeRemaining: number;
   deckCount: number;
   discardTop: CardModel | null;
+  drawnCard: CardModel | null;
+  lockedPlayerIds: string[];
+  pendingEffect?: { effect: 'queen-peek' | 'jack-swap'; cardValue: string } | null;
   dutchCallerId: string | null;
   round: number;
   players: ClientPlayer[];
@@ -116,7 +123,12 @@ export interface ClientToServerEvents {
   'game:draw-deck': () => void;
   'game:draw-discard': () => void;
   'game:discard': (data: { cardIndex: number }) => void;
+  'game:discard-drawn': () => void;
   'game:swap': (data: { handIndex: number }) => void;
+  'game:swap-drawn': (data: { handIndex: number }) => void;
+  'game:match-discard': (data: { handIndex: number }) => void;
+  'game:queen-peek': (data: { cardIndex: number }) => void;
+  'game:jack-swap': (data: { player1Id: string; cardIndex1: number; player2Id: string; cardIndex2: number }) => void;
   'game:use-special': (data: { kind: 'peek' | 'swap' | 'reveal' | 'steal'; targetPlayerId?: string; targetCardIndex?: number }) => void;
   'game:call-dutch': () => void;
   'game:next-round': () => void;
@@ -132,6 +144,8 @@ export interface ServerToClientEvents {
   'game:dutch-called': (data: { playerId: string; playerName: string }) => void;
   'game:round-end': (data: { results: RoundResult[] }) => void;
   'game:end': (data: { results: RoundResult[]; winnerId: string }) => void;
+  'game:match-result': (data: { playerId: string; playerName: string; success: boolean; message: string; card?: CardModel }) => void;
+  'game:effect-pending': (data: { effect: 'queen-peek' | 'jack-swap'; cardValue: string }) => void;
   'chat:new': (data: ChatMessage) => void;
   'player:joined': (data: ClientPlayer) => void;
   'player:left': (data: { playerId: string }) => void;
