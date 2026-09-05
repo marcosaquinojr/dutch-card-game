@@ -15,6 +15,7 @@ import {
   HelpCircle,
   RefreshCw,
   X,
+  Box,
 } from "lucide-react";
 import { DutchLogo } from "@/components/dutch/DutchLogo";
 import { PlayerAvatar } from "@/components/dutch/PlayerAvatar";
@@ -23,6 +24,7 @@ import { Deck, DiscardPile } from "@/components/dutch/Deck";
 import { PlayingCard, CardBack } from "@/components/dutch/PlayingCard";
 import { TurnIndicator } from "@/components/dutch/TurnIndicator";
 import { SpecialCardModal, type SpecialKind } from "@/components/dutch/SpecialCardModal";
+import { Dutch3DTable } from "@/components/dutch/Dutch3DTable";
 import { useGame, useRoom, useChat } from "@/lib/socket-client";
 import {
   playCardDraw,
@@ -85,6 +87,24 @@ function Game() {
   const [showRules, setShowRules] = useState(false);
   const [activeMatchModal, setActiveMatchModal] = useState<any>(null);
   const [mutedState, setMutedState] = useState(isSfxMuted());
+  const [is3DEnabled, setIs3DEnabled] = useState(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("dutch_3d_mode");
+      return saved !== null ? saved === "1" : true;
+    }
+    return true;
+  });
+
+  const toggle3DMode = () => {
+    setIs3DEnabled((prev) => {
+      const next = !prev;
+      if (typeof window !== "undefined") {
+        localStorage.setItem("dutch_3d_mode", next ? "1" : "0");
+      }
+      toast(next ? "Mesa 3D com Three.js ativada! 🎲" : "Modo 2D clássico ativado. 🃏");
+      return next;
+    });
+  };
 
   const prevTurnPlayerIdRef = useRef<string | null>(null);
   const lastTickedSecondRef = useRef<number | null>(null);
@@ -339,6 +359,22 @@ function Game() {
         <TurnIndicator name={activePlayer.name} seconds={gameState.turnTimeRemaining} />
 
         <div className="flex items-center gap-2">
+          {/* Botão Alternar Modo 3D / 2D */}
+          <button
+            onClick={toggle3DMode}
+            className={cn(
+              "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-black tracking-wider transition-all cursor-pointer shadow-md select-none",
+              is3DEnabled
+                ? "bg-emerald-500/25 text-emerald-300 border border-emerald-400/60 shadow-[0_0_12px_rgba(52,211,153,0.35)] glow-emerald"
+                : "bg-white/5 text-white/50 border border-white/10 hover:text-white hover:bg-white/10"
+            )}
+            title={is3DEnabled ? "Mudar para visão 2D clássica" : "Ativar mesa 3D com Three.js"}
+          >
+            <Box className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">{is3DEnabled ? "MESA 3D" : "2D"}</span>
+            <span className="sm:hidden">{is3DEnabled ? "3D" : "2D"}</span>
+          </button>
+
           {/* Botão de Som Mute/Unmute */}
           <button
             onClick={() => {
@@ -511,65 +547,131 @@ function Game() {
         </div>
 
         {/* Centro da Mesa: Monte, Descarte e Carta Comprada */}
-        <div className="relative z-10 flex flex-col items-center justify-center my-auto py-1">
-          <div className="flex items-center gap-4 sm:gap-6 rounded-3xl glass-strong px-6 py-3 border border-white/15 shadow-2xl bg-black/40 backdrop-blur-xl">
-            {/* Monte de Compras */}
-            <div className="flex flex-col items-center gap-1">
-              <Deck
-                count={gameState.deckCount}
-                onClick={isMyTurn && !drawnCard ? handleDrawDeck : undefined}
-              />
-              <span className="text-[10px] uppercase font-bold tracking-widest text-white/50">
-                Monte ({gameState.deckCount})
-              </span>
-            </div>
+        <div className="relative z-10 flex flex-col items-center justify-center my-auto py-1 w-full">
+          {is3DEnabled ? (
+            /* Mesa 3D com Three.js (Mesa de Feltro, Montes 3D e Carta Comprada 3D) */
+            <div className="relative w-full max-w-2xl h-[250px] sm:h-[300px] md:h-[340px] flex flex-col items-center justify-center">
+              <div className="absolute inset-0 rounded-3xl overflow-hidden border border-white/15 shadow-[0_20px_50px_rgba(0,0,0,0.8)] bg-gradient-to-b from-black/60 to-black/90">
+                <Dutch3DTable
+                  deckCount={gameState.deckCount}
+                  discardTop={gameState.discardTop}
+                  drawnCard={drawnCard}
+                  dutchAlert={dutchAlert}
+                  matchResult={matchResult}
+                  isMyTurn={isMyTurn}
+                  onDrawDeck={isMyTurn && !drawnCard ? handleDrawDeck : undefined}
+                />
+                {/* Selo indicativo e dica de clique no monte */}
+                <div className="pointer-events-none absolute top-2.5 left-3 flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest text-emerald-400/80 bg-black/60 px-2 py-0.5 rounded-full backdrop-blur-md border border-emerald-500/30">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  Mesa 3D WebGL
+                </div>
 
-            {/* Carta Comprada no Turno (quando ativa) */}
-            <AnimatePresence>
-              {drawnCard && (
-                <motion.div
-                  initial={{ scale: 0.8, opacity: 0, y: -10 }}
-                  animate={{ scale: 1, opacity: 1, y: 0 }}
-                  exit={{ scale: 0.8, opacity: 0, y: -10 }}
-                  className="flex flex-col items-center gap-1.5 px-3 py-2 rounded-2xl bg-[color:var(--neon)]/10 border-2 border-[color:var(--neon)] glow-neon shadow-2xl"
-                >
-                  <span className="text-[9px] uppercase font-black tracking-widest text-[color:var(--neon)] flex items-center gap-1">
-                    <Sparkles className="h-3 w-3" /> Carta Comprada
-                  </span>
-                  <PlayingCard card={drawnCard} size="md" />
-                  <span className="text-xs font-bold text-white">
-                    {drawnCard.value} de {drawnCard.suit} ({drawnCard.points} pts)
-                  </span>
-                  {drawnCard.value === "Q" && (
-                    <span className="text-[9px] font-bold text-[color:var(--neon)]">
-                      👁️ Dama: Espie uma carta ao descartar!
-                    </span>
-                  )}
-                  {drawnCard.value === "J" && (
-                    <span className="text-[9px] font-bold text-yellow-300">
-                      🃏 Valete: Troque 2 cartas na mesa!
-                    </span>
-                  )}
-                  <button
-                    onClick={handleDiscardDrawn}
-                    className="mt-1 rounded-full bg-red-500/20 hover:bg-red-500/40 text-red-300 border border-red-500/50 px-3 py-1 text-[10px] font-bold transition-all cursor-pointer"
+                {isMyTurn && !drawnCard && (
+                  <div className="pointer-events-none absolute top-2.5 right-3 text-[9px] font-bold text-white/60 bg-black/60 px-2 py-0.5 rounded-full backdrop-blur-md border border-white/10 hidden sm:block">
+                    Clique no monte 3D para comprar 👆
+                  </div>
+                )}
+              </div>
+
+              {/* HUD sobreposto para informações da Carta Comprada em 3D */}
+              <AnimatePresence>
+                {drawnCard && (
+                  <motion.div
+                    initial={{ scale: 0.85, opacity: 0, y: 12 }}
+                    animate={{ scale: 1, opacity: 1, y: 0 }}
+                    exit={{ scale: 0.85, opacity: 0, y: 12 }}
+                    className="relative z-20 mt-auto mb-2 flex flex-col sm:flex-row items-center gap-2 px-3.5 py-1.5 rounded-2xl bg-black/85 border border-[color:var(--neon)] glow-neon backdrop-blur-md shadow-2xl"
                   >
-                    Descartar {drawnCard.value}{drawnCard.suit} sem trocar
-                  </button>
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            {/* Monte de Descarte */}
-            <div className="flex flex-col items-center gap-1">
-              <DiscardPile
-                top={gameState.discardTop || { id: "top", value: "A", suit: "♠", points: 1 }}
-              />
-              <span className="text-[10px] uppercase font-bold tracking-widest text-white/50">
-                Descarte
-              </span>
+                    <div className="flex items-center gap-2 text-xs font-bold text-white">
+                      <span className="text-[10px] uppercase font-black tracking-wider text-[color:var(--neon)] flex items-center gap-1">
+                        <Sparkles className="h-3 w-3" /> Carta:
+                      </span>
+                      <span>
+                        {drawnCard.value} de {drawnCard.suit} ({drawnCard.points} pts)
+                      </span>
+                      {drawnCard.value === "Q" && (
+                        <span className="text-[9px] font-bold text-sky-300 bg-sky-500/20 px-1.5 py-0.5 rounded">
+                          👁️ Dama: Espie uma carta ao descartar!
+                        </span>
+                      )}
+                      {drawnCard.value === "J" && (
+                        <span className="text-[9px] font-bold text-yellow-300 bg-yellow-500/20 px-1.5 py-0.5 rounded">
+                          🃏 Valete: Troque 2 cartas na mesa!
+                        </span>
+                      )}
+                    </div>
+                    <button
+                      onClick={handleDiscardDrawn}
+                      className="rounded-full bg-red-500/20 hover:bg-red-500/40 text-red-300 border border-red-500/50 px-3 py-1 text-[10px] font-bold transition-all cursor-pointer"
+                    >
+                      Descartar {drawnCard.value}{drawnCard.suit} sem trocar
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
-          </div>
+          ) : (
+            /* Modo 2D Clássico */
+            <div className="flex items-center gap-4 sm:gap-6 rounded-3xl glass-strong px-6 py-3 border border-white/15 shadow-2xl bg-black/40 backdrop-blur-xl">
+              {/* Monte de Compras */}
+              <div className="flex flex-col items-center gap-1">
+                <Deck
+                  count={gameState.deckCount}
+                  onClick={isMyTurn && !drawnCard ? handleDrawDeck : undefined}
+                />
+                <span className="text-[10px] uppercase font-bold tracking-widest text-white/50">
+                  Monte ({gameState.deckCount})
+                </span>
+              </div>
+
+              {/* Carta Comprada no Turno (quando ativa) */}
+              <AnimatePresence>
+                {drawnCard && (
+                  <motion.div
+                    initial={{ scale: 0.8, opacity: 0, y: -10 }}
+                    animate={{ scale: 1, opacity: 1, y: 0 }}
+                    exit={{ scale: 0.8, opacity: 0, y: -10 }}
+                    className="flex flex-col items-center gap-1.5 px-3 py-2 rounded-2xl bg-[color:var(--neon)]/10 border-2 border-[color:var(--neon)] glow-neon shadow-2xl"
+                  >
+                    <span className="text-[9px] uppercase font-black tracking-widest text-[color:var(--neon)] flex items-center gap-1">
+                      <Sparkles className="h-3 w-3" /> Carta Comprada
+                    </span>
+                    <PlayingCard card={drawnCard} size="md" />
+                    <span className="text-xs font-bold text-white">
+                      {drawnCard.value} de {drawnCard.suit} ({drawnCard.points} pts)
+                    </span>
+                    {drawnCard.value === "Q" && (
+                      <span className="text-[9px] font-bold text-[color:var(--neon)]">
+                        👁️ Dama: Espie uma carta ao descartar!
+                      </span>
+                    )}
+                    {drawnCard.value === "J" && (
+                      <span className="text-[9px] font-bold text-yellow-300">
+                        🃏 Valete: Troque 2 cartas na mesa!
+                      </span>
+                    )}
+                    <button
+                      onClick={handleDiscardDrawn}
+                      className="mt-1 rounded-full bg-red-500/20 hover:bg-red-500/40 text-red-300 border border-red-500/50 px-3 py-1 text-[10px] font-bold transition-all cursor-pointer"
+                    >
+                      Descartar {drawnCard.value}{drawnCard.suit} sem trocar
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* Monte de Descarte */}
+              <div className="flex flex-col items-center gap-1">
+                <DiscardPile
+                  top={gameState.discardTop || { id: "top", value: "A", suit: "♠", points: 1 }}
+                />
+                <span className="text-[10px] uppercase font-bold tracking-widest text-white/50">
+                  Descarte
+                </span>
+              </div>
+            </div>
+          )}
 
           {/* Botões de Ação do Turno (quando ainda não comprou) */}
           {isMyTurn && !drawnCard && (
