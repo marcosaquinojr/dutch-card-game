@@ -106,6 +106,17 @@ function Game() {
     });
   };
 
+  const persistentPlayerId = typeof window !== "undefined" ? localStorage.getItem("dutch_playerId") : null;
+  const playerName = (typeof window !== "undefined" ? localStorage.getItem("dutch_playerName") : null) || "Você";
+  const me =
+    (persistentPlayerId && gameState?.players?.find((p) => p.id === persistentPlayerId)) ||
+    gameState?.players?.find((p) => p.name === playerName) ||
+    gameState?.players?.[0];
+  const isMyTurn = Boolean(gameState?.currentTurnPlayerId && me?.id && gameState.currentTurnPlayerId === me.id);
+  const isMeLocked = Boolean(me?.id && gameState?.lockedPlayerIds?.includes(me.id));
+  const activePlayer = gameState?.players?.find((p) => p.id === gameState.currentTurnPlayerId) || me;
+  const others = gameState?.players ? gameState.players.filter((p) => p.id !== me?.id) : [];
+
   const prevTurnPlayerIdRef = useRef<string | null>(null);
   const lastTickedSecondRef = useRef<number | null>(null);
 
@@ -225,17 +236,6 @@ function Game() {
     );
   }
 
-  const persistentPlayerId = typeof window !== "undefined" ? localStorage.getItem("dutch_playerId") : null;
-  const playerName = (typeof window !== "undefined" ? localStorage.getItem("dutch_playerName") : null) || "Você";
-  const me =
-    (persistentPlayerId && gameState.players.find((p) => p.id === persistentPlayerId)) ||
-    gameState.players.find((p) => p.name === playerName) ||
-    gameState.players[0];
-  const isMyTurn = gameState.currentTurnPlayerId === me?.id;
-  const isMeLocked = gameState.lockedPlayerIds?.includes(me?.id);
-  const activePlayer = gameState.players.find((p) => p.id === gameState.currentTurnPlayerId) || me;
-
-  const others = gameState.players.filter((p) => p.id !== me?.id);
   const positions = [
     "top-4 left-1/2 -translate-x-1/2", // top center
     "top-1/3 left-4 -translate-y-1/2", // left
