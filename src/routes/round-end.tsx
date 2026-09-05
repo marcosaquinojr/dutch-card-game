@@ -6,6 +6,7 @@ import { DutchLogo } from "@/components/dutch/DutchLogo";
 import { PlayerAvatar } from "@/components/dutch/PlayerAvatar";
 import { PlayingCard } from "@/components/dutch/PlayingCard";
 import { useGame, getSocket, getPersistentPlayerId } from "@/lib/socket-client";
+import { playRoundWin } from "@/lib/sound-effects";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/round-end")({
@@ -23,6 +24,11 @@ export const Route = createFileRoute("/round-end")({
 function RoundEnd() {
   const nav = useNavigate();
   const { roundResults, gameState, nextRound } = useGame();
+
+  // Toca fanfarra de vitória ao carregar tela
+  useEffect(() => {
+    playRoundWin();
+  }, []);
 
   // Emite sync se roundResults ainda não chegou por algum motivo
   useEffect(() => {

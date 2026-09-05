@@ -1,10 +1,11 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { motion, AnimatePresence } from "framer-motion";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import {
   ArrowLeft,
   LogOut,
   Volume2,
+  VolumeX,
   Flag,
   Sparkles,
   Zap,
@@ -23,6 +24,20 @@ import { PlayingCard, CardBack } from "@/components/dutch/PlayingCard";
 import { TurnIndicator } from "@/components/dutch/TurnIndicator";
 import { SpecialCardModal, type SpecialKind } from "@/components/dutch/SpecialCardModal";
 import { useGame, useRoom, useChat } from "@/lib/socket-client";
+import {
+  playCardDraw,
+  playCardPlace,
+  playCardFlip,
+  playCardDiscard,
+  playMatchSuccess,
+  playMatchFail,
+  playDutchCall,
+  playYourTurn,
+  playTimerTick,
+  playSpecialPower,
+  isSfxMuted,
+  toggleSfxMuted,
+} from "@/lib/sound-effects";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
@@ -69,6 +84,10 @@ function Game() {
   const [modalKind, setModalKind] = useState<SpecialKind | null>(null);
   const [showRules, setShowRules] = useState(false);
   const [activeMatchModal, setActiveMatchModal] = useState<any>(null);
+  const [mutedState, setMutedState] = useState(isSfxMuted());
+
+  const prevTurnPlayerIdRef = useRef<string | null>(null);
+  const lastTickedSecondRef = useRef<number | null>(null);
 
   // Estado para troca do Valete na própria mesa (sem modal invasivo)
   const [jackMode, setJackMode] = useState<"prompt" | "selecting-first" | "selecting-second" | null>(null);
@@ -78,9 +97,37 @@ function Game() {
     playerName: string;
   } | null>(null);
 
+  // Som ao mudar de turno para o jogador
+  useEffect(() => {
+    if (gameState?.currentTurnPlayerId && me?.id) {
+      if (gameState.currentTurnPlayerId === me.id && prevTurnPlayerIdRef.current !== me.id) {
+        playYourTurn();
+      }
+      prevTurnPlayerIdRef.current = gameState.currentTurnPlayerId;
+    }
+  }, [gameState?.currentTurnPlayerId, me?.id]);
+
+  // Tique-taque nos últimos 5 segundos do turno do jogador
+  useEffect(() => {
+    if (isMyTurn && gameState?.turnTimeRemaining <= 5 && gameState?.turnTimeRemaining > 0) {
+      if (lastTickedSecondRef.current !== gameState.turnTimeRemaining) {
+        lastTickedSecondRef.current = gameState.turnTimeRemaining;
+        playTimerTick();
+      }
+    }
+  }, [isMyTurn, gameState?.turnTimeRemaining]);
+
+  // Som ao iniciar a fase de memorização inicial
+  useEffect(() => {
+    if (gameState?.phase === "memorize") {
+      playCardFlip();
+    }
+  }, [gameState?.phase]);
+
   // Reage a efeitos especiais pendentes (Q ou J descartados)
   useEffect(() => {
     if (pendingEffect) {
+      playSpecialPower();
       if (pendingEffect.effect === "queen-peek") {
         setModalKind("peek");
         toast("Você descartou uma Dama (Q)! Escolha uma carta para espiar.", { icon: "👁️" });
@@ -96,13 +143,15 @@ function Game() {
     }
   }, [pendingEffect]);
 
-  // Notificações e Animação de Snap / Descarte Igual
+  // Notificações e Animação de Snap / Descarte Igual com som
   useEffect(() => {
     if (matchResult) {
       setActiveMatchModal(matchResult);
       if (matchResult.success) {
+        playMatchSuccess();
         toast.success(matchResult.message, { icon: "⚡" });
       } else {
+        playMatchFail();
         toast.error(matchResult.message, { icon: "❌" });
       }
       const timer = setTimeout(() => setActiveMatchModal(null), 5000);
@@ -113,30 +162,11 @@ function Game() {
   // Alerta sonoro e notificação dramática quando alguém chama DUTCH
   useEffect(() => {
     if (dutchAlert) {
+      playDutchCall();
       toast.warning(`🚩 ${dutchAlert.playerName} BATEU NA MESA E CHAMOU DUTCH! Última rodada!`, {
         duration: 8000,
         icon: "🚨",
       });
-
-      try {
-        const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-        if (AudioCtx) {
-          const ctx = new AudioCtx();
-          const osc = ctx.createOscillator();
-          const gain = ctx.createGain();
-          osc.type = "sine";
-          osc.frequency.setValueAtTime(587.33, ctx.currentTime);
-          osc.frequency.setValueAtTime(880, ctx.currentTime + 0.15);
-          gain.gain.setValueAtTime(0.25, ctx.currentTime);
-          gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
-          osc.connect(gain);
-          gain.connect(ctx.destination);
-          osc.start();
-          osc.stop(ctx.currentTime + 0.5);
-        }
-      } catch {
-        // Ignora erro de áudio caso interação não tenha ocorrido
-      }
     }
   }, [dutchAlert]);
 
@@ -203,12 +233,14 @@ function Game() {
       toast.error("Você já comprou uma carta neste turno!");
       return;
     }
+    playCardDraw();
     drawFromDeck();
     toast("Você comprou uma carta do monte", { icon: "🃏" });
   };
 
   const handleDiscardDrawn = () => {
     if (!isMyTurn) return;
+    playCardDiscard();
     discardDrawnCard();
   };
 
@@ -218,6 +250,7 @@ function Game() {
       toast.error("Compre uma carta do monte primeiro para trocar!");
       return;
     }
+    playCardPlace();
     swapDrawnCard(index);
     toast.success("Carta trocada e colocada virada para baixo na sua grade! 🤫");
   };
@@ -243,6 +276,7 @@ function Game() {
       toast.error("Você já comprou carta! Chame DUTCH no início do seu próximo turno.");
       return;
     }
+    playDutchCall();
     callDutch();
     toast.success("Você bateu na mesa e chamou DUTCH! 🚩");
   };
@@ -251,6 +285,7 @@ function Game() {
     if (!jackMode || (jackMode !== "selecting-first" && jackMode !== "selecting-second")) return;
 
     if (jackMode === "selecting-first") {
+      playCardFlip();
       setJackFirstCard({ playerId: targetPlayerId, cardIndex, playerName: targetPlayerName });
       setJackMode("selecting-second");
       toast(`1ª carta escolhida (${targetPlayerName}, posição ${cardIndex + 1}). Agora escolha a 2ª carta! 🎯`);
@@ -259,6 +294,7 @@ function Game() {
         toast.error("Você selecionou a mesma carta! Escolha outra carta diferente para trocar.");
         return;
       }
+      playCardPlace();
       jackSwap(jackFirstCard.playerId, jackFirstCard.cardIndex, targetPlayerId, cardIndex);
       toast.success(`Cartas de ${jackFirstCard.playerName} e ${targetPlayerName} trocadas com sucesso! 🔄`);
       setJackMode(null);
@@ -303,9 +339,25 @@ function Game() {
         <TurnIndicator name={activePlayer.name} seconds={gameState.turnTimeRemaining} />
 
         <div className="flex items-center gap-2">
+          {/* Botão de Som Mute/Unmute */}
+          <button
+            onClick={() => {
+              const nextMuted = toggleSfxMuted();
+              setMutedState(nextMuted);
+              if (!nextMuted) playCardDraw();
+            }}
+            className={cn(
+              "grid h-9 w-9 place-items-center rounded-full glass hover:bg-white/10 transition-colors cursor-pointer",
+              mutedState ? "text-red-400 border border-red-500/30" : "text-white/80"
+            )}
+            title={mutedState ? "Ativar efeitos sonoros" : "Desativar efeitos sonoros"}
+          >
+            {mutedState ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+          </button>
+
           <button
             onClick={() => setShowRules(true)}
-            className="grid h-9 w-9 place-items-center rounded-full glass hover:bg-white/10 text-white/80"
+            className="grid h-9 w-9 place-items-center rounded-full glass hover:bg-white/10 text-white/80 cursor-pointer"
             title="Regras do Dutch"
           >
             <HelpCircle className="h-4 w-4" />

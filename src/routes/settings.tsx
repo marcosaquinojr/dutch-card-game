@@ -6,6 +6,8 @@ import { DutchLogo } from "@/components/dutch/DutchLogo";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
 
+import { getSfxVolume, setSfxVolume, setSfxMuted, playCardDraw } from "@/lib/sound-effects";
+
 export const Route = createFileRoute("/settings")({
   head: () => ({
     meta: [
@@ -20,10 +22,22 @@ export const Route = createFileRoute("/settings")({
 
 function Settings() {
   const [music, setMusic] = useState([70]);
-  const [sfx, setSfx] = useState([80]);
+  const [sfx, setSfx] = useState([Math.round(getSfxVolume() * 100)]);
   const [reduce, setReduce] = useState(false);
   const [autoReady, setAutoReady] = useState(true);
   const [hints, setHints] = useState(true);
+
+  const handleSfxChange = (v: number[]) => {
+    setSfx(v);
+    const vol = v[0] / 100;
+    setSfxVolume(vol);
+    if (vol <= 0.01) {
+      setSfxMuted(true);
+    } else {
+      setSfxMuted(false);
+      playCardDraw();
+    }
+  };
 
   return (
     <main className="min-h-screen px-4 py-8">
@@ -43,7 +57,7 @@ function Settings() {
 
           <Group title="Áudio">
             <SliderRow label="Música" value={music} onChange={setMusic} />
-            <SliderRow label="Efeitos sonoros" value={sfx} onChange={setSfx} />
+            <SliderRow label="Efeitos sonoros" value={sfx} onChange={handleSfxChange} />
           </Group>
 
           <Group title="Interface">
