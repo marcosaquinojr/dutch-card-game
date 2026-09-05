@@ -87,7 +87,7 @@ function RoundEnd() {
   // Identifica razão da vitória
   const winnerHand = winner.hand || [];
   const winnerZeroCards = winnerHand.length === 0;
-  const isWinnerDutchCaller = winner.bonusOrPenalty < 0 || (gameState?.dutchCallerId === winner.playerId);
+  const isWinnerDutchCaller = gameState?.dutchCallerId === winner.playerId;
 
   let victoryHeadline = "🏆 Venceu a rodada com a menor pontuação!";
   let victorySubtitle = `${winner.roundTotal} ponto(s) nesta rodada`;
@@ -100,7 +100,7 @@ function RoundEnd() {
   } else if (isWinnerDutchCaller) {
     victoryBadgeType = "dutch";
     victoryHeadline = `🚩 ${winner.playerName} pediu DUTCH e venceu!`;
-    victorySubtitle = `Teve a menor pontuação da mesa e recebeu -5 pontos de bônus! (Total: ${winner.roundTotal} pts)`;
+    victorySubtitle = `Teve a menor pontuação da mesa com ${winner.roundTotal} ponto(s)!`;
   } else if (gameState?.dutchCallerId && gameState.dutchCallerId !== winner.playerId) {
     const callerName = resultsList.find((p: any) => p.playerId === gameState.dutchCallerId)?.playerName || "Outro jogador";
     victoryHeadline = `🎯 ${winner.playerName} venceu a rodada!`;
@@ -142,13 +142,13 @@ function RoundEnd() {
             {victoryBadgeType === "zero" && (
               <div className="inline-flex items-center gap-2 px-5 py-2 rounded-full bg-emerald-500/20 border border-emerald-400 text-emerald-300 font-black text-sm md:text-base shadow-lg animate-pulse">
                 <Zap className="h-5 w-5 fill-emerald-400" />
-                <span>0 cartas na mão — Vitória absoluta sem pontos!</span>
+                <span>0 cartas na mão — Vitória absoluta com 0 pontos!</span>
               </div>
             )}
             {victoryBadgeType === "dutch" && (
               <div className="inline-flex items-center gap-2 px-5 py-2 rounded-full bg-yellow-500/20 border border-yellow-400 text-yellow-300 font-black text-sm md:text-base shadow-lg">
                 <Flag className="h-5 w-5 fill-yellow-400" />
-                <span>Dutch confirmado com sucesso (-5 pts de bônus)!</span>
+                <span>Dutch confirmado com a menor pontuação ({winner.roundTotal} pts)!</span>
               </div>
             )}
             {victoryBadgeType === "score" && (
@@ -224,19 +224,12 @@ function RoundEnd() {
                         <Zap className="h-3.5 w-3.5 fill-current" /> Zerou a mão (0 cartas)
                       </span>
                     )}
-                    {p.bonusOrPenalty < 0 && (
-                      <span className="text-[11px] font-black text-emerald-800 dark:text-emerald-300 flex items-center gap-1">
-                        <Flag className="h-3.5 w-3.5 fill-current" /> Bateu Dutch (-5 bônus)
-                      </span>
-                    )}
-                    {p.bonusOrPenalty > 0 && (
-                      <span className="text-[11px] font-black text-red-700 dark:text-red-400 flex items-center gap-1">
-                        ❌ Bateu Dutch (+10 penalidade)
-                      </span>
-                    )}
-                    {!p.bonusOrPenalty && isDutchCaller && (
-                      <span className="text-[11px] font-bold text-yellow-600 dark:text-yellow-400 flex items-center gap-1">
-                        <Flag className="h-3.5 w-3.5" /> Pediu Dutch
+                    {isDutchCaller && (
+                      <span className={cn(
+                        "text-[11px] font-bold flex items-center gap-1",
+                        isWinner ? "text-emerald-950 font-black" : "text-yellow-400"
+                      )}>
+                        <Flag className="h-3.5 w-3.5 fill-current" /> Pediu Dutch
                       </span>
                     )}
                   </div>
@@ -268,7 +261,7 @@ function RoundEnd() {
                               isWinner ? "bg-black/20 text-black" : "bg-white/10 text-white/70"
                             )}
                           >
-                            {c.points} {c.points === 1 || c.points === -1 ? "pt" : "pts"}
+                            {c.points} {c.points === 1 ? "pt" : "pts"}
                           </span>
                         </div>
                       ))
@@ -286,20 +279,9 @@ function RoundEnd() {
                       {roundScore} <span className="text-sm font-bold">pts</span>
                     </div>
 
-                    {/* Breakdown detalhado da conta */}
-                    {bonus < 0 ? (
-                      <div className={cn("text-[11px] font-bold mt-0.5 whitespace-nowrap", isWinner ? "text-emerald-950 font-black" : "text-emerald-400")}>
-                        {cardSum} pts <span className="underline">- 5 (Bônus Dutch)</span> = {roundScore} pts
-                      </div>
-                    ) : bonus > 0 ? (
-                      <div className={cn("text-[11px] font-bold mt-0.5 whitespace-nowrap", isWinner ? "text-red-950 font-black" : "text-red-400")}>
-                        {cardSum} pts <span className="underline">+ 10 (Penalidade)</span> = {roundScore} pts
-                      </div>
-                    ) : (
-                      <div className={cn("text-[11px] font-medium mt-0.5 whitespace-nowrap", isWinner ? "text-black/70" : "text-white/60")}>
-                        {cardSum} pts nas cartas
-                      </div>
-                    )}
+                    <div className={cn("text-[11px] font-medium mt-0.5 whitespace-nowrap", isWinner ? "text-black/70" : "text-white/60")}>
+                      {handCards.length === 0 ? "0 pts (zerou a mão)" : `${cardSum} pts nas cartas`}
+                    </div>
                   </div>
 
                   <div className={cn("text-xs font-semibold mt-1", isWinner ? "text-black/80" : "text-white/60")}>

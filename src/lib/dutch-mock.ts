@@ -38,7 +38,7 @@ function pointsFor(v: CardValue, s?: Suit): number {
   if (v === "J") return 11;
   if (v === "Q") return 12;
   if (v === "K") {
-    if (s === "♠" || s === "♣") return -1;
+    if (s === "♠" || s === "♣") return 0;
     return 13;
   }
   return parseInt(v, 10);
@@ -46,7 +46,7 @@ function pointsFor(v: CardValue, s?: Suit): number {
 
 let __id = 0;
 export function makeCard(v: CardValue, s: Suit, special?: CardModel["special"]): CardModel {
-  return { id: `c${++__id}`, value: v, suit: s, points: pointsFor(v), special };
+  return { id: `c${++__id}`, value: v, suit: s, points: pointsFor(v, s), special };
 }
 
 export function randomCard(): CardModel {

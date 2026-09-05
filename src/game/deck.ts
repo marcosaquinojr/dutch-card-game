@@ -7,7 +7,7 @@ import * as crypto from 'crypto';
  * - 2 a 10 = valor da carta
  * - Valete (J) = 11 pt
  * - Dama (Q) = 12 pt
- * - Reis Pretos (K♠, K♣) = -1 pt!
+ * - Reis Pretos (K♠, K♣) = 0 pt!
  * - Reis Vermelhos (K♥, K♦) = 13 pt
  */
 export function pointsFor(value: CardValue, suit?: Suit): number {
@@ -15,7 +15,7 @@ export function pointsFor(value: CardValue, suit?: Suit): number {
   if (value === 'J') return 11;
   if (value === 'Q') return 12;
   if (value === 'K') {
-    if (suit === '♠' || suit === '♣') return -1;
+    if (suit === '♠' || suit === '♣') return 0;
     return 13;
   }
   return parseInt(value, 10);

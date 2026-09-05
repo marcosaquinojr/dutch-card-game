@@ -747,7 +747,7 @@ function Game() {
               </div>
               <div className="text-xs space-y-2.5 text-white/80 max-h-[60vh] overflow-y-auto pr-1">
                 <p>🎯 <strong>Objetivo</strong>: Ter a menor soma de pontos nas 4 cartas viradas para baixo à sua frente.</p>
-                <p>🔢 <strong>Valores das Cartas</strong>: Ás = 1 pt | 2 a 10 = valor nominal | Valete = 11 pts | Dama = 12 pts | <strong>Reis Pretos (♠, ♣) = -1 pt!</strong> | Reis Vermelhos (♥, ♦) = 13 pts.</p>
+                <p>🔢 <strong>Valores das Cartas</strong>: Ás = 1 pt | 2 a 10 = valor nominal | Valete = 11 pts | Dama = 12 pts | <strong>Reis Pretos (♠, ♣) = 0 pts!</strong> | Reis Vermelhos (♥, ♦) = 13 pts.</p>
                 <p>👁️ <strong>Dama (Q)</strong>: Ao descartar, espie uma de suas cartas viradas para baixo.</p>
                 <p>🃏 <strong>Valete (J)</strong>: Ao descartar, troque quaisquer 2 cartas na mesa (sua com oponente, ou entre dois oponentes).</p>
                 <p>⚡ <strong>Descarte Igual (Snap)</strong>: A qualquer momento, se souber que tem uma carta igual à do topo do descarte, clique no raio ⚡ nela para descartá-la e ficar com uma carta a menos! Se errar, recebe +1 carta de penalidade.</p>

@@ -8,55 +8,33 @@ export function calculateHandScore(hand: CardModel[]): number {
 }
 
 /**
- * Aplica o bônus ou penalidade para o jogador que chamou Dutch
- * Se ele tem a menor pontuação, ganha -5 de bônus. Se não, recebe +10 de penalidade.
+ * Calcula os resultados de cada jogador na rodada.
+ * A pontuação é puramente a soma das cartas da mão (K preto = 0 pt).
+ * Não há bônus ou penalidades artificiais: quem tiver a menor pontuação vence a rodada!
  */
-export function applyDutchBonus(results: RoundResult[], dutchCallerId: string | null): RoundResult[] {
-  if (!dutchCallerId) return results;
-
+export function calculateRoundResults(room: GameRoom): RoundResult[] {
   let minScore = Infinity;
-  let callerScore = Infinity;
-  
-  for (const r of results) {
-    if (r.handScore < minScore) {
-      minScore = r.handScore;
-    }
-    if (r.playerId === dutchCallerId) {
-      callerScore = r.handScore;
+  for (const player of room.players) {
+    const score = calculateHandScore(player.hand);
+    if (score < minScore) {
+      minScore = score;
     }
   }
 
-  // Se empatou com a menor pontuação mas não é único, a regra pode variar, 
-  // mas vamos assumir que ele tem que ter a menor pontuação igual a minScore
-  // e se outro também tem minScore, ainda conta como sucesso, ou apenas se for estritamente menor?
-  // Normalmente, o chamador precisa ter a menor pontuação da mesa.
-  // Vamos assumir <= minScore. Como callerScore >= minScore sempre,
-  // callerScore === minScore significa que ele tem a menor.
-  const success = callerScore === minScore;
-
-  return results.map(r => {
-    if (r.playerId === dutchCallerId) {
-      const bonusOrPenalty = success ? -5 : 10;
-      return {
-        ...r,
-        bonusOrPenalty,
-        roundTotal: r.handScore + bonusOrPenalty,
-        cumulativeScore: r.cumulativeScore - r.handScore + (r.handScore + bonusOrPenalty),
-        reason: success
-          ? 'Bateu Dutch com a menor pontuação (-5 pts bônus!) 🚩'
-          : 'Bateu Dutch mas não teve a menor pontuação (+10 pts penalidade) ❌',
-      };
-    }
-    return r;
-  });
-}
-
-/**
- * Calcula os resultados de cada jogador na rodada
- */
-export function calculateRoundResults(room: GameRoom): RoundResult[] {
-  const initialResults: RoundResult[] = room.players.map(player => {
+  return room.players.map((player) => {
     const handScore = calculateHandScore(player.hand);
+    let reason: string | undefined;
+
+    if (player.hand.length === 0) {
+      reason = 'Descartou todas as cartas (0 pts)! ⚡';
+    } else if (room.dutchCallerId === player.id) {
+      if (handScore === minScore) {
+        reason = 'Chamou Dutch e venceu com a menor pontuação! 🚩';
+      } else {
+        reason = 'Chamou Dutch, mas não teve a menor pontuação ❌';
+      }
+    }
+
     return {
       playerId: player.id,
       playerName: player.name,
@@ -65,11 +43,9 @@ export function calculateRoundResults(room: GameRoom): RoundResult[] {
       bonusOrPenalty: 0,
       roundTotal: handScore,
       cumulativeScore: player.score + handScore,
-      reason: player.hand.length === 0 ? 'Descartou todas as cartas (0 pts)! ⚡' : undefined,
+      reason,
     };
   });
-
-  return applyDutchBonus(initialResults, room.dutchCallerId);
 }
 
 /**

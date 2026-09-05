@@ -17,11 +17,11 @@ export const Route = createFileRoute("/tutorial")({
 
 const STEPS = [
   { Icon: Flag, title: "Objetivo", body: "Termine a rodada com a menor soma de pontos. O primeiro a atingir a pontuação máxima perde a partida." },
-  { Icon: Layers, title: "Cartas & pontos", body: "Cartas numéricas valem seu número. Ás = 1 pt, J = 11, Q = 12, Reis Pretos (♠, ♣) = -1 pt, Reis Vermelhos = 13 pts." },
+  { Icon: Layers, title: "Cartas & pontos", body: "Cartas numéricas valem seu número. Ás = 1 pt, J = 11, Q = 12, Reis Pretos (♠, ♣) = 0 pts (soma 0!), Reis Vermelhos (♥, ♦) = 13 pts." },
   { Icon: Eye, title: "Memória", body: "Você só vê algumas de suas cartas no início. Depois todas ficam viradas — memorize bem!" },
   { Icon: Sparkles, title: "Cartas especiais", body: "Algumas cartas dão poderes ao serem descartadas: olhar, revelar ou trocar." },
   { Icon: Repeat2, title: "Trocar & descartar", body: "No seu turno: compre uma carta e escolha se troca por uma sua ou descarta." },
-  { Icon: Users, title: "Chamar DUTCH", body: "Se acha que tem a menor pontuação, chame DUTCH. Se acertar, ganha bônus. Se errar, penalidade!" },
+  { Icon: Users, title: "Chamar DUTCH", body: "Se acha que tem a menor pontuação da mesa, chame DUTCH antes de comprar! Todos têm mais 1 turno e quem tiver menos pontos vence a rodada." },
 ];
 
 function Tutorial() {
