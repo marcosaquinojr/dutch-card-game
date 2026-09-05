@@ -87,7 +87,7 @@ export function PlayingCard({ card, faceDown, size = "lg", selected, highlight, 
               <span>{card?.value ?? "?"}</span>
               <span>{card?.suit}</span>
             </div>
-            <div className={cn("grid place-items-center text-3xl", suitColor(card?.suit ?? ""))}>
+            <div className={cn("grid place-items-center font-bold leading-none", size === "sm" ? "text-lg" : size === "md" ? "text-2xl" : "text-3xl", suitColor(card?.suit ?? ""))}>
               {card?.suit}
             </div>
             <div className={cn("flex items-center justify-between text-[10px] font-semibold text-white/70")}>

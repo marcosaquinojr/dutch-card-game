@@ -26,8 +26,13 @@ export function getPersistentPlayerId(): string {
 
 let globalRoomState: RoomState | null = null;
 let globalGameState: ClientGameState | null = null;
+let globalRoundResults: any = null;
+let globalGameResults: any = null;
+
 const roomListeners = new Set<(state: RoomState | null) => void>();
 const gameListeners = new Set<(state: ClientGameState | null) => void>();
+const roundEndListeners = new Set<(data: any) => void>();
+const gameEndListeners = new Set<(data: any) => void>();
 
 /** Conecta ao servidor Socket.IO (apenas no navegador) */
 export function connectSocket(): TypedSocket | null {
@@ -59,6 +64,26 @@ export function connectSocket(): TypedSocket | null {
     socket.on('game:state', (data: ClientGameState) => {
       globalGameState = data;
       gameListeners.forEach((fn) => fn(data));
+    });
+
+    socket.on('game:round-end', (data: any) => {
+      globalRoundResults = data;
+      if (typeof window !== 'undefined') {
+        try {
+          sessionStorage.setItem('dutch_roundResults', JSON.stringify(data));
+        } catch {}
+      }
+      roundEndListeners.forEach((fn) => fn(data));
+    });
+
+    socket.on('game:end', (data: any) => {
+      globalGameResults = data;
+      if (typeof window !== 'undefined') {
+        try {
+          sessionStorage.setItem('dutch_gameResults', JSON.stringify(data));
+        } catch {}
+      }
+      gameEndListeners.forEach((fn) => fn(data));
     });
 
     socket.on('connect_error', (err) => {
@@ -177,8 +202,27 @@ export function useRoom() {
 export function useGame() {
   const [gameState, setGameState] = useState<ClientGameState | null>(globalGameState);
   const [drawnCard, setDrawnCard] = useState<CardModel | null>(globalGameState?.drawnCard || null);
-  const [roundResults, setRoundResults] = useState<any>(null);
-  const [gameResults, setGameResults] = useState<any>(null);
+  const [roundResults, setRoundResults] = useState<any>(() => {
+    if (globalRoundResults) return globalRoundResults;
+    if (typeof window !== 'undefined') {
+      try {
+        const cached = sessionStorage.getItem('dutch_roundResults');
+        if (cached) return JSON.parse(cached);
+      } catch {}
+    }
+    return null;
+  });
+
+  const [gameResults, setGameResults] = useState<any>(() => {
+    if (globalGameResults) return globalGameResults;
+    if (typeof window !== 'undefined') {
+      try {
+        const cached = sessionStorage.getItem('dutch_gameResults');
+        if (cached) return JSON.parse(cached);
+      } catch {}
+    }
+    return null;
+  });
 
   const [pendingEffect, setPendingEffect] = useState<{ effect: 'queen-peek' | 'jack-swap'; cardValue: string } | null>(
     globalGameState?.pendingEffect || null
@@ -203,6 +247,8 @@ export function useGame() {
     };
 
     gameListeners.add(handleUpdate);
+    roundEndListeners.add(setRoundResults);
+    gameEndListeners.add(setGameResults);
 
     // Sincroniza imediatamente com o servidor
     const roomCode = typeof window !== 'undefined' ? localStorage.getItem('dutch_currentRoomCode') : null;
@@ -212,24 +258,20 @@ export function useGame() {
     });
 
     const handleCardDrawn = (data: { card: CardModel }) => setDrawnCard(data.card);
-    const handleRoundEnd = (data: any) => setRoundResults(data);
-    const handleGameEnd = (data: any) => setGameResults(data);
     const handleEffectPending = (data: { effect: 'queen-peek' | 'jack-swap'; cardValue: string }) => setPendingEffect(data);
     const handleMatchResult = (data: any) => setMatchResult(data);
     const handleDutchCalled = (data: { playerId: string; playerName: string }) => setDutchAlert(data);
 
     s.on('game:card-drawn', handleCardDrawn as any);
-    s.on('game:round-end', handleRoundEnd);
-    s.on('game:end', handleGameEnd);
     s.on('game:effect-pending', handleEffectPending);
     s.on('game:match-result', handleMatchResult);
     s.on('game:dutch-called', handleDutchCalled);
 
     return () => {
       gameListeners.delete(handleUpdate);
+      roundEndListeners.delete(setRoundResults);
+      gameEndListeners.delete(setGameResults);
       s.off('game:card-drawn', handleCardDrawn as any);
-      s.off('game:round-end', handleRoundEnd);
-      s.off('game:end', handleGameEnd);
       s.off('game:effect-pending', handleEffectPending);
       s.off('game:match-result', handleMatchResult);
       s.off('game:dutch-called', handleDutchCalled);
@@ -316,6 +358,13 @@ export function useGame() {
   }, []);
 
   const nextRound = useCallback(() => {
+    globalRoundResults = null;
+    if (typeof window !== 'undefined') {
+      try {
+        sessionStorage.removeItem('dutch_roundResults');
+      } catch {}
+    }
+    setRoundResults(null);
     const s = connectSocket();
     if (s) s.emit('game:next-round');
   }, []);

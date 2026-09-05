@@ -1,17 +1,18 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useEffect } from "react";
 import { motion } from "framer-motion";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Trophy, Zap, Flag, Sparkles } from "lucide-react";
 import { DutchLogo } from "@/components/dutch/DutchLogo";
 import { PlayerAvatar } from "@/components/dutch/PlayerAvatar";
 import { PlayingCard } from "@/components/dutch/PlayingCard";
-import { useGame } from "@/lib/socket-client";
+import { useGame, getSocket, getPersistentPlayerId } from "@/lib/socket-client";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/round-end")({
   head: () => ({
     meta: [
       { title: "Fim da rodada — DUTCH" },
-      { name: "description", content: "Confira os pontos, o vencedor da rodada e prepare-se para a próxima." },
+      { name: "description", content: "Confira os pontos, o vencedor da rodada e as cartas reveladas de todos os jogadores." },
       { property: "og:title", content: "Fim da rodada — DUTCH" },
       { property: "og:description", content: "Cartas reveladas e placar atualizado. Próxima rodada em segundos." },
     ],
@@ -23,11 +24,88 @@ function RoundEnd() {
   const nav = useNavigate();
   const { roundResults, gameState, nextRound } = useGame();
 
-  const resultsList = roundResults?.results || [];
-  const winner = [...resultsList].sort((a, b) => a.roundTotal - b.roundTotal)[0] || {
-    playerName: "Alguém",
-    playerId: "",
-  };
+  // Emite sync se roundResults ainda não chegou por algum motivo
+  useEffect(() => {
+    if (!roundResults) {
+      const s = getSocket();
+      s?.emit("game:sync", {
+        playerId: getPersistentPlayerId(),
+        roomCode: gameState?.code,
+      });
+    }
+  }, [roundResults, gameState?.code]);
+
+  // Monta lista de resultados (prioriza roundResults do servidor, fallback para gameState.players)
+  const resultsList = (roundResults?.results && roundResults.results.length > 0)
+    ? roundResults.results
+    : (gameState?.players || []).map((p: any) => {
+        const hand = p.hand || [];
+        const handScore = hand.reduce(
+          (acc: number, c: any) => acc + (typeof c?.points === "number" ? c.points : 0),
+          0
+        );
+        return {
+          playerId: p.id,
+          playerName: p.name,
+          hand,
+          handScore,
+          bonusOrPenalty: p.isDutchCaller ? (handScore === 0 ? -5 : 0) : 0,
+          roundTotal: handScore,
+          cumulativeScore: p.score ?? handScore,
+          reason: hand.length === 0 ? "Descartou todas as cartas (0 pts)! ⚡" : undefined,
+        };
+      });
+
+  // Localiza vencedor
+  let winner = resultsList.find((p: any) => p.playerId === roundResults?.winnerId);
+  if (!winner) {
+    winner = [...resultsList].sort((a: any, b: any) => a.roundTotal - b.roundTotal)[0];
+  }
+  if (!winner && roundResults?.winnerName) {
+    winner = {
+      playerName: roundResults.winnerName,
+      playerId: roundResults.winnerId || "",
+      hand: [],
+      handScore: 0,
+      bonusOrPenalty: 0,
+      roundTotal: 0,
+      cumulativeScore: 0,
+    };
+  }
+  if (!winner) {
+    winner = {
+      playerName: "Vencedor",
+      playerId: "",
+      hand: [],
+      handScore: 0,
+      bonusOrPenalty: 0,
+      roundTotal: 0,
+      cumulativeScore: 0,
+    };
+  }
+
+  // Identifica razão da vitória
+  const winnerHand = winner.hand || [];
+  const winnerZeroCards = winnerHand.length === 0;
+  const isWinnerDutchCaller = winner.bonusOrPenalty < 0 || (gameState?.dutchCallerId === winner.playerId);
+
+  let victoryHeadline = "🏆 Venceu a rodada com a menor pontuação!";
+  let victorySubtitle = `${winner.roundTotal} ponto(s) nesta rodada`;
+  let victoryBadgeType: "zero" | "dutch" | "score" = "score";
+
+  if (winnerZeroCards) {
+    victoryBadgeType = "zero";
+    victoryHeadline = `⚡ ${winner.playerName} descartou TODAS as cartas!`;
+    victorySubtitle = "Zerou as cartas da mão e venceu imediatamente com 0 pontos!";
+  } else if (isWinnerDutchCaller) {
+    victoryBadgeType = "dutch";
+    victoryHeadline = `🚩 ${winner.playerName} pediu DUTCH e venceu!`;
+    victorySubtitle = `Teve a menor pontuação da mesa e recebeu -5 pontos de bônus! (Total: ${winner.roundTotal} pts)`;
+  } else if (gameState?.dutchCallerId && gameState.dutchCallerId !== winner.playerId) {
+    const callerName = resultsList.find((p: any) => p.playerId === gameState.dutchCallerId)?.playerName || "Outro jogador";
+    victoryHeadline = `🎯 ${winner.playerName} venceu a rodada!`;
+    victorySubtitle = `${callerName} pediu Dutch, mas ${winner.playerName} tinha a menor mão (${winner.roundTotal} pts)!`;
+  }
 
   const handleNextRound = () => {
     nextRound();
@@ -35,8 +113,9 @@ function RoundEnd() {
   };
 
   return (
-    <main className="min-h-screen px-4 py-8">
+    <main className="min-h-screen px-4 py-8 bg-slate-950/80 text-white">
       <div className="mx-auto max-w-5xl">
+        {/* Header */}
         <div className="mb-6 flex items-center justify-between">
           <DutchLogo size="sm" />
           <div className="text-xs uppercase tracking-widest text-white/50">
@@ -44,31 +123,62 @@ function RoundEnd() {
           </div>
         </div>
 
-        <motion.div initial={{ y: 30, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="text-center">
+        {/* Winner Hero Banner */}
+        <motion.div
+          initial={{ y: 20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          className="text-center rounded-3xl p-6 md:p-8 glass border border-white/10 relative overflow-hidden shadow-2xl"
+        >
           <div className="inline-flex items-center gap-2 rounded-full glass px-4 py-1.5 text-[11px] uppercase tracking-[0.3em] text-white/70">
-            Fim da rodada {gameState?.round || 1}
+            Fim da Rodada {gameState?.round || 1}
           </div>
-          <h1 className="mt-3 font-display text-4xl font-black text-gradient-neon md:text-6xl">
-            🏆 {winner.playerName} venceu a rodada!
+
+          <h1 className="mt-3 font-display text-3xl md:text-5xl font-black text-gradient-neon">
+            {victoryHeadline}
           </h1>
-          {winner.hand?.length === 0 ? (
-            <div className="mt-3 inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-500/20 border border-emerald-400 text-emerald-300 font-black text-sm shadow-lg animate-bounce">
-              <span>⚡</span>
-              <span>Descartou TODAS as suas cartas e zerou os pontos!</span>
-            </div>
-          ) : roundResults?.reason ? (
-            <p className="mt-2 text-sm text-yellow-300 font-bold flex items-center justify-center gap-1.5">
-              <span>📌</span> {roundResults.reason}
+
+          {/* Special victory pill */}
+          <div className="mt-3 flex justify-center">
+            {victoryBadgeType === "zero" && (
+              <div className="inline-flex items-center gap-2 px-5 py-2 rounded-full bg-emerald-500/20 border border-emerald-400 text-emerald-300 font-black text-sm md:text-base shadow-lg animate-pulse">
+                <Zap className="h-5 w-5 fill-emerald-400" />
+                <span>0 cartas na mão — Vitória absoluta sem pontos!</span>
+              </div>
+            )}
+            {victoryBadgeType === "dutch" && (
+              <div className="inline-flex items-center gap-2 px-5 py-2 rounded-full bg-yellow-500/20 border border-yellow-400 text-yellow-300 font-black text-sm md:text-base shadow-lg">
+                <Flag className="h-5 w-5 fill-yellow-400" />
+                <span>Dutch confirmado com sucesso (-5 pts de bônus)!</span>
+              </div>
+            )}
+            {victoryBadgeType === "score" && (
+              <div className="inline-flex items-center gap-2 px-5 py-2 rounded-full bg-blue-500/20 border border-blue-400 text-blue-300 font-bold text-sm md:text-base shadow-lg">
+                <Trophy className="h-5 w-5 fill-blue-400" />
+                <span>{victorySubtitle}</span>
+              </div>
+            )}
+          </div>
+
+          {roundResults?.reason && roundResults.reason !== victorySubtitle && (
+            <p className="mt-2 text-xs md:text-sm text-white/70">
+              📌 {roundResults.reason}
             </p>
-          ) : (
-            <p className="mt-2 text-sm text-white/60">Menor pontuação leva a rodada 🏆</p>
           )}
         </motion.div>
 
-        <div className="mt-10 space-y-4">
+        {/* Players & Revealed Hands */}
+        <div className="mt-8 space-y-4">
+          <div className="flex items-center justify-between px-2 text-xs font-bold uppercase tracking-wider text-white/50">
+            <span>Jogador & Status</span>
+            <span>Cartas Reveladas na Mão</span>
+            <span className="text-right">Pontuação</span>
+          </div>
+
           {resultsList.map((p: any, i: number) => {
             const isWinner = p.playerId === winner.playerId;
             const handCards = p.hand || [];
+            const isDutchCaller = p.bonusOrPenalty !== 0 || (gameState?.dutchCallerId === p.playerId);
+
             return (
               <motion.div
                 key={p.playerId || i}
@@ -76,57 +186,97 @@ function RoundEnd() {
                 animate={{ x: 0, opacity: 1 }}
                 transition={{ delay: i * 0.08 }}
                 className={cn(
-                  "grid grid-cols-[auto_1fr_auto] items-center gap-4 rounded-2xl border p-4 md:p-5 transition-all",
-                  isWinner ? "gradient-gold border-yellow-300/60 text-black glow-gold shadow-2xl scale-[1.02]" : "glass border-white/10",
+                  "flex flex-col md:grid md:grid-cols-[260px_1fr_160px] items-start md:items-center gap-4 rounded-2xl border p-4 md:p-5 transition-all shadow-md",
+                  isWinner
+                    ? "gradient-gold border-yellow-300/80 text-black glow-gold shadow-2xl scale-[1.01]"
+                    : "glass border-white/10 text-white"
                 )}
               >
-                <div className="flex items-center gap-3">
-                  <PlayerAvatar name={p.playerName} avatar={`https://api.dicebear.com/9.x/adventurer/svg?seed=${encodeURIComponent(p.playerName)}&backgroundColor=1e293b`} size="md" isHost={isWinner} />
+                {/* Column 1: Player info */}
+                <div className="flex items-center gap-3 w-full">
+                  <PlayerAvatar
+                    name={p.playerName}
+                    avatar={`https://api.dicebear.com/9.x/adventurer/svg?seed=${encodeURIComponent(p.playerName)}&backgroundColor=1e293b`}
+                    size="md"
+                    isHost={isWinner}
+                  />
                   <div className="flex flex-col">
                     <div className="flex items-center gap-2">
-                      <span className={cn("font-bold text-sm", isWinner ? "text-black" : "text-white")}>{p.playerName}</span>
+                      <span className={cn("font-bold text-base", isWinner ? "text-black" : "text-white")}>
+                        {p.playerName}
+                      </span>
                       {isWinner && (
-                        <span className="text-[10px] font-black uppercase bg-black text-yellow-400 px-2 py-0.5 rounded-full shadow">
-                          👑 Vencedor
+                        <span className="text-[10px] font-black uppercase bg-black text-yellow-400 px-2 py-0.5 rounded-full shadow inline-flex items-center gap-1">
+                          <Trophy className="h-3 w-3" /> Vencedor
                         </span>
                       )}
                     </div>
+
+                    {/* Status badges */}
+                    {handCards.length === 0 && (
+                      <span className="text-[11px] font-black text-emerald-600 dark:text-emerald-300 flex items-center gap-1">
+                        <Zap className="h-3.5 w-3.5 fill-current" /> Zerou a mão (0 cartas)
+                      </span>
+                    )}
                     {p.bonusOrPenalty < 0 && (
-                      <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-300 flex items-center gap-1">
-                        🚩 Bateu Dutch (-5 bônus)
+                      <span className="text-[11px] font-black text-emerald-800 dark:text-emerald-300 flex items-center gap-1">
+                        <Flag className="h-3.5 w-3.5 fill-current" /> Bateu Dutch (-5 bônus)
                       </span>
                     )}
                     {p.bonusOrPenalty > 0 && (
-                      <span className="text-[11px] font-bold text-red-600 dark:text-red-300 flex items-center gap-1">
+                      <span className="text-[11px] font-black text-red-700 dark:text-red-400 flex items-center gap-1">
                         ❌ Bateu Dutch (+10 penalidade)
+                      </span>
+                    )}
+                    {!p.bonusOrPenalty && isDutchCaller && (
+                      <span className="text-[11px] font-bold text-yellow-600 dark:text-yellow-400 flex items-center gap-1">
+                        <Flag className="h-3.5 w-3.5" /> Pediu Dutch
                       </span>
                     )}
                   </div>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-2">
+                {/* Column 2: Revealed Hand Cards */}
+                <div className="flex flex-wrap items-center gap-3 w-full py-1">
                   {handCards.length === 0 ? (
-                    <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-xs font-black">
-                      ⚡ Zerou as cartas da mão! (0 cartas)
+                    <div className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 text-xs font-black">
+                      <Sparkles className="h-4 w-4" /> Sem cartas na mão (todas descartadas!)
                     </div>
                   ) : (
-                    handCards.map((c: any) => (
-                      <motion.div key={c.id} initial={{ rotateY: 180 }} animate={{ rotateY: 0 }} transition={{ delay: 0.4 + Math.random() * 0.3 }}>
-                        <PlayingCard card={c} size="sm" />
-                      </motion.div>
+                    handCards.map((c: any, cardIdx: number) => (
+                      <div key={c.id || cardIdx} className="flex flex-col items-center gap-1">
+                        <motion.div
+                          initial={{ scale: 0.8, opacity: 0 }}
+                          animate={{ scale: 1, opacity: 1 }}
+                          transition={{ delay: 0.15 + cardIdx * 0.05 }}
+                        >
+                          <PlayingCard card={c} size="md" faceDown={false} />
+                        </motion.div>
+                        <span
+                          className={cn(
+                            "text-[10px] font-bold px-1.5 py-0.5 rounded",
+                            isWinner ? "bg-black/20 text-black" : "bg-white/10 text-white/70"
+                          )}
+                        >
+                          {c.points} {c.points === 1 || c.points === -1 ? "pt" : "pts"}
+                        </span>
+                      </div>
                     ))
                   )}
                 </div>
 
-                <div className="text-right">
-                  <div className={cn("text-[10px] uppercase tracking-widest font-bold", isWinner ? "text-black/80" : "text-white/50")}>
-                    Pontos Rodada
+                {/* Column 3: Score */}
+                <div className="text-right w-full md:w-auto flex md:flex-col justify-between items-center md:items-end border-t md:border-t-0 pt-2 md:pt-0 border-white/10">
+                  <div>
+                    <div className={cn("text-[10px] uppercase tracking-widest font-bold", isWinner ? "text-black/70" : "text-white/50")}>
+                      Pontos Rodada
+                    </div>
+                    <div className={cn("font-display text-3xl font-black leading-tight", isWinner ? "text-black" : "text-white")}>
+                      {p.roundTotal}
+                    </div>
                   </div>
-                  <div className={cn("font-display text-3xl font-black", isWinner ? "text-black" : "text-white")}>
-                    {p.roundTotal}
-                  </div>
-                  <div className={cn("text-[10px] font-medium", isWinner ? "text-black/70" : "text-white/50")}>
-                    Total Jogo: {p.cumulativeScore}
+                  <div className={cn("text-xs font-semibold", isWinner ? "text-black/80" : "text-white/60")}>
+                    Total do Jogo: <span className="font-bold">{p.cumulativeScore} pts</span>
                   </div>
                 </div>
               </motion.div>
@@ -134,14 +284,19 @@ function RoundEnd() {
           })}
         </div>
 
-        <div className="mt-10 flex justify-center gap-3">
-          <Link to="/lobby" className="rounded-full border border-white/15 px-6 py-3 text-sm font-semibold text-white/80 hover:bg-white/5">
+        {/* Action Buttons */}
+        <div className="mt-10 flex justify-center gap-4">
+          <Link
+            to="/lobby"
+            className="rounded-full border border-white/15 px-6 py-3 text-sm font-semibold text-white/80 hover:bg-white/5 transition-colors"
+          >
             Voltar ao lobby
           </Link>
           <motion.button
-            whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.97 }}
             onClick={handleNextRound}
-            className="flex items-center gap-2 rounded-full gradient-neon px-8 py-3 font-display font-bold text-black glow-neon"
+            className="flex items-center gap-2 rounded-full gradient-neon px-8 py-3 font-display font-bold text-black glow-neon shadow-lg cursor-pointer"
           >
             Próxima Rodada <ArrowRight className="h-4 w-4" />
           </motion.button>
@@ -150,3 +305,4 @@ function RoundEnd() {
     </main>
   );
 }
+

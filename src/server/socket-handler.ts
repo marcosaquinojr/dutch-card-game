@@ -312,6 +312,19 @@ export function registerSocketHandlers(io: TypedServer): void {
       if (roomData) {
         socket.emit('room:state', GameEngine.getRoomState(roomData.room));
         socket.emit('game:state', GameEngine.getClientState(roomData.room, roomData.player.id));
+        if (roomData.room.phase === 'round-end') {
+          const results = calculateRoundResults(roomData.room);
+          const sorted = [...results].sort((a, b) => a.roundTotal - b.roundTotal);
+          const winner = sorted[0];
+          socket.emit('game:round-end', {
+            results,
+            winnerId: winner?.playerId,
+            winnerName: winner?.playerName,
+            reason: roomData.room.dutchCallerId
+              ? `Rodada finalizada após DUTCH chamado por ${roomData.room.players.find((p) => p.id === roomData.room.dutchCallerId)?.name || 'jogador'}`
+              : 'Menor pontuação',
+          });
+        }
       }
     });
 
