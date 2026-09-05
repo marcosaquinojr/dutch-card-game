@@ -297,54 +297,62 @@ function Game() {
       </div>
 
       {/* Área da Mesa */}
-      <div className="relative mx-auto h-[calc(100vh-65px)] max-w-6xl p-2 flex flex-col justify-between">
-        {/* Oponentes ao redor da mesa com suas cartas em grade */}
-        <div className="relative w-full h-44">
-          {others.map((p, i) => (
-            <div key={p.id} className={cn("absolute z-10", positions[i % positions.length])}>
-              <div
-                className={cn(
-                  "flex flex-col items-center gap-1.5 rounded-2xl glass px-3 py-2 transition-all shadow-xl",
-                  gameState.currentTurnPlayerId === p.id
-                    ? "ring-2 ring-[color:var(--neon)] glow-neon bg-black/60"
-                    : p.isLocked
-                      ? "border border-amber-500/40 bg-amber-500/10"
-                      : "border border-white/10 bg-black/30",
-                )}
-              >
-                <div className="flex items-center gap-2">
-                  <PlayerAvatar
-                    name={p.name}
-                    avatar={p.avatar}
-                    size="sm"
-                    isActive={gameState.currentTurnPlayerId === p.id}
-                    score={p.score}
-                  />
-                  {p.isLocked && (
-                    <span className="flex items-center gap-1 text-[9px] font-extrabold text-amber-300 uppercase tracking-wider">
-                      <Lock className="h-2.5 w-2.5" /> Dutch
+      {/* Área da Mesa */}
+      <div className="relative mx-auto h-[calc(100vh-65px)] max-w-5xl p-2 flex flex-col justify-between overflow-hidden">
+        {/* Oponentes ao redor do topo da mesa */}
+        <div className="w-full flex flex-wrap items-center justify-center gap-2 sm:gap-4 pt-1 z-10">
+          {others.map((p) => (
+            <div
+              key={p.id}
+              className={cn(
+                "flex items-center gap-2 rounded-2xl glass px-3 py-1.5 transition-all shadow-md",
+                gameState.currentTurnPlayerId === p.id
+                  ? "ring-2 ring-[color:var(--neon)] glow-neon bg-black/60 scale-105"
+                  : p.isLocked
+                    ? "border border-amber-500/40 bg-amber-500/10"
+                    : "border border-white/10 bg-black/30",
+              )}
+            >
+              <PlayerAvatar
+                name={p.name}
+                avatar={p.avatar}
+                size="sm"
+                isActive={gameState.currentTurnPlayerId === p.id}
+                score={p.score}
+              />
+              <div className="flex flex-col min-w-0">
+                <div className="flex items-center gap-1">
+                  <span className="font-bold text-xs text-white/90 truncate max-w-[80px]">{p.name}</span>
+                  {p.isBot && (
+                    <span className="text-[8px] bg-sky-500/20 text-sky-300 font-bold px-1 rounded">
+                      BOT
                     </span>
                   )}
                 </div>
+                {p.isLocked ? (
+                  <span className="flex items-center gap-0.5 text-[9px] font-extrabold text-amber-300 uppercase">
+                    <Lock className="h-2.5 w-2.5" /> Dutch
+                  </span>
+                ) : (
+                  <span className="text-[10px] text-white/50">{p.cardsCount} cartas</span>
+                )}
+              </div>
 
-                {/* Grade 2x2 de cartas viradas para baixo do oponente */}
-                <div className={cn(p.cardsCount <= 4 ? "grid grid-cols-2 gap-1.5" : "flex -space-x-3")}>
-                  {Array.from({ length: p.cardsCount }).map((_, cardIdx) => (
-                    <div key={cardIdx} className="scale-75">
-                      <CardBack size="sm" />
-                    </div>
-                  ))}
-                </div>
+              {/* Mini grade 2x2 de cartas do oponente */}
+              <div className={cn(p.cardsCount <= 4 ? "grid grid-cols-2 gap-0.5" : "flex -space-x-2", "scale-75 origin-right")}>
+                {Array.from({ length: p.cardsCount }).map((_, cardIdx) => (
+                  <CardBack key={cardIdx} size="sm" />
+                ))}
               </div>
             </div>
           ))}
         </div>
 
-        {/* Centro: Monte de Compras + Descarte + Botão de Descarte Igual */}
-        <div className="relative z-10 flex flex-col items-center justify-center my-auto">
-          <div className="flex items-center gap-6 rounded-3xl glass-strong px-8 py-5 border border-white/15 shadow-2xl bg-black/40 backdrop-blur-xl">
+        {/* Centro da Mesa: Monte, Descarte e Carta Comprada */}
+        <div className="relative z-10 flex flex-col items-center justify-center my-auto py-1">
+          <div className="flex items-center gap-4 sm:gap-6 rounded-3xl glass-strong px-6 py-3 border border-white/15 shadow-2xl bg-black/40 backdrop-blur-xl">
             {/* Monte de Compras */}
-            <div className="flex flex-col items-center gap-1.5">
+            <div className="flex flex-col items-center gap-1">
               <Deck
                 count={gameState.deckCount}
                 onClick={isMyTurn && !drawnCard ? handleDrawDeck : undefined}
@@ -354,8 +362,44 @@ function Game() {
               </span>
             </div>
 
+            {/* Carta Comprada no Turno (quando ativa) */}
+            <AnimatePresence>
+              {drawnCard && (
+                <motion.div
+                  initial={{ scale: 0.8, opacity: 0, y: -10 }}
+                  animate={{ scale: 1, opacity: 1, y: 0 }}
+                  exit={{ scale: 0.8, opacity: 0, y: -10 }}
+                  className="flex flex-col items-center gap-1.5 px-3 py-2 rounded-2xl bg-[color:var(--neon)]/10 border-2 border-[color:var(--neon)] glow-neon shadow-2xl"
+                >
+                  <span className="text-[9px] uppercase font-black tracking-widest text-[color:var(--neon)] flex items-center gap-1">
+                    <Sparkles className="h-3 w-3" /> Carta Comprada
+                  </span>
+                  <PlayingCard card={drawnCard} size="md" />
+                  <span className="text-xs font-bold text-white">
+                    {drawnCard.value} de {drawnCard.suit} ({drawnCard.points} pts)
+                  </span>
+                  {drawnCard.value === "Q" && (
+                    <span className="text-[9px] font-bold text-[color:var(--neon)]">
+                      👁️ Dama: Espie uma carta ao descartar!
+                    </span>
+                  )}
+                  {drawnCard.value === "J" && (
+                    <span className="text-[9px] font-bold text-yellow-300">
+                      🃏 Valete: Troque 2 cartas na mesa!
+                    </span>
+                  )}
+                  <button
+                    onClick={handleDiscardDrawn}
+                    className="mt-1 rounded-full bg-red-500/20 hover:bg-red-500/40 text-red-300 border border-red-500/50 px-3 py-1 text-[10px] font-bold transition-all cursor-pointer"
+                  >
+                    Descartar {drawnCard.value}{drawnCard.suit} sem trocar
+                  </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
             {/* Monte de Descarte */}
-            <div className="flex flex-col items-center gap-1.5">
+            <div className="flex flex-col items-center gap-1">
               <DiscardPile
                 top={gameState.discardTop || { id: "top", value: "A", suit: "♠", points: 1 }}
               />
@@ -365,104 +409,58 @@ function Game() {
             </div>
           </div>
 
+          {/* Botões de Ação do Turno (quando ainda não comprou) */}
+          {isMyTurn && !drawnCard && (
+            <div className="flex flex-wrap items-center justify-center gap-3 mt-3">
+              <ActionButton
+                onClick={handleDrawDeck}
+                label="Comprar do Monte"
+                tone="neon"
+              />
+              {!isMeLocked && gameState.dutchCallerId === null && (
+                <ActionButton
+                  onClick={handleCallDutch}
+                  label="BATER NA MESA (DUTCH!)"
+                  Icon={Flag}
+                  tone="gold"
+                />
+              )}
+            </div>
+          )}
+
           {/* Dica rápida de Snap */}
-          {gameState.discardTop && !isMeLocked && (
+          {gameState.discardTop && !isMeLocked && !drawnCard && (
             <div className="mt-2 text-[11px] font-bold text-yellow-300/80 flex items-center gap-1 bg-yellow-500/10 px-3 py-1 rounded-full border border-yellow-500/20 backdrop-blur-md">
               <Zap className="h-3 w-3 fill-current" />
-              Sabe que tem uma carta igual a {gameState.discardTop.value}? Clique no raio ⚡ para descartar (Snap)!
+              Sabe que tem carta igual a {gameState.discardTop.value}? Clique no raio ⚡ para Snap!
             </div>
           )}
         </div>
 
-        {/* Sua Área (Parte Inferior com Grade 2x2) */}
-        <div className="relative z-10 flex flex-col items-center gap-3 pb-2">
-          {/* Banner de Carta Comprada (quando o jogador comprou no seu turno) */}
-          <AnimatePresence>
-            {drawnCard && (
-              <motion.div
-                initial={{ y: 20, opacity: 0, scale: 0.95 }}
-                animate={{ y: 0, opacity: 1, scale: 1 }}
-                exit={{ y: 20, opacity: 0, scale: 0.95 }}
-                className="flex flex-col items-center gap-2 rounded-3xl glass-strong border-2 border-[color:var(--neon)] p-3 shadow-2xl max-w-md w-full text-center bg-black/80 backdrop-blur-xl"
-              >
-                <div className="text-[11px] uppercase tracking-widest text-[color:var(--neon)] font-extrabold flex items-center gap-1.5">
-                  <Sparkles className="h-3.5 w-3.5" /> Carta Comprada do Monte
-                </div>
-                <div className="flex items-center gap-4 w-full justify-center">
-                  <PlayingCard card={drawnCard} size="md" />
-                  <div className="text-left space-y-1">
-                    <div className="text-sm font-bold text-white">
-                      {drawnCard.value} de {drawnCard.suit} ({drawnCard.points} pts)
-                    </div>
-                    {drawnCard.value === "Q" && (
-                      <div className="text-[11px] text-[color:var(--neon)] font-semibold">
-                        👁️ Dama: Ao descartar, você poderá espiar uma de suas cartas!
-                      </div>
-                    )}
-                    {drawnCard.value === "J" && (
-                      <div className="text-[11px] text-yellow-300 font-semibold">
-                        🃏 Valete: Ao descartar, você poderá trocar 2 cartas quaisquer na mesa!
-                      </div>
-                    )}
-                    <p className="text-[11px] text-white/70">
-                      👉 Clique em uma das suas cartas abaixo na grade para <strong>Trocar</strong>, ou descarte-a direto.
-                    </p>
-                  </div>
-                </div>
-                <button
-                  onClick={handleDiscardDrawn}
-                  className="w-full rounded-full bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/40 py-2 text-xs font-bold transition-all cursor-pointer"
-                >
-                  Descartar {drawnCard.value}{drawnCard.suit} sem trocar
-                </button>
-              </motion.div>
-            )}
-          </AnimatePresence>
+        {/* Sua Área: Grade 2x2 com todas as 4 cartas 100% visíveis */}
+        <div className="relative z-10 flex flex-col items-center gap-1 pb-2">
+          {drawnCard && (
+            <div className="text-xs font-black uppercase tracking-widest text-[color:var(--neon)] animate-bounce flex items-center gap-1 bg-black/70 px-3.5 py-1 rounded-full border border-[color:var(--neon)]/50 shadow-lg">
+              👇 Clique em uma das 4 cartas abaixo para substituir 👇
+            </div>
+          )}
 
-          {/* Sua Grade de Cartas 2x2 */}
-          <div className="flex flex-col items-center">
-            {drawnCard && (
-              <div className="text-[11px] font-extrabold uppercase tracking-widest text-[color:var(--neon)] animate-bounce mb-1">
-                👇 Clique na carta abaixo que deseja substituir 👇
-              </div>
-            )}
-            <PlayerHand
-              cards={gameState.yourHand}
-              faceDown
-              revealedIndexes={gameState.yourKnownCards}
-              size="lg"
-              layout="grid"
-              isLocked={isMeLocked}
-              canMatch={!!gameState.discardTop}
-              onCardClick={(index: number) => {
-                if (drawnCard) {
-                  handleSwapCard(index);
-                }
-              }}
-              onMatchClick={handleMatchSnap}
-            />
-          </div>
-
-          {/* Botões de Ação do Turno */}
-          <div className="flex flex-wrap items-center justify-center gap-2 mt-1">
-            {isMyTurn && !drawnCard && (
-              <>
-                <ActionButton
-                  onClick={handleDrawDeck}
-                  label="Comprar do Monte"
-                  tone="neon"
-                />
-                {!isMeLocked && gameState.dutchCallerId === null && (
-                  <ActionButton
-                    onClick={handleCallDutch}
-                    label="BATER NA MESA (DUTCH!)"
-                    Icon={Flag}
-                    tone="gold"
-                  />
-                )}
-              </>
-            )}
-          </div>
+          <PlayerHand
+            cards={gameState.yourHand}
+            faceDown
+            revealedIndexes={gameState.yourKnownCards}
+            size="md"
+            layout="grid"
+            isLocked={isMeLocked}
+            canMatch={!!gameState.discardTop}
+            swapActive={Boolean(drawnCard)}
+            onCardClick={(index: number) => {
+              if (drawnCard) {
+                handleSwapCard(index);
+              }
+            }}
+            onMatchClick={handleMatchSnap}
+          />
         </div>
       </div>
 
