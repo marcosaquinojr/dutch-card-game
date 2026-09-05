@@ -247,6 +247,7 @@ export class GameEngine {
   ): {
     success: boolean;
     card?: CardModel;
+    topDiscard?: CardModel;
     penaltyCard?: CardModel;
     message: string;
     newCount: number;
@@ -276,7 +277,8 @@ export class GameEngine {
       return {
         success: true,
         card,
-        message: `Acertou o par! Descartou ${card.value}${card.suit} e agora tem ${player.hand.length} cartas.`,
+        topDiscard,
+        message: `Acertou o par! Sua carta era ${card.value}${card.suit} e foi descartada. Você agora tem ${player.hand.length} carta(s)!`,
         newCount: player.hand.length,
       };
     } else {
@@ -293,11 +295,23 @@ export class GameEngine {
         player.hand.push(penaltyCard);
       }
 
+      // Vira a carta errada para cima por 6 segundos para o jogador ver e memorizar
+      if (!player.knownCards.includes(handIndex)) {
+        player.knownCards.push(handIndex);
+        setTimeout(() => {
+          const idx = player.knownCards.indexOf(handIndex);
+          if (idx !== -1) {
+            player.knownCards.splice(idx, 1);
+          }
+        }, 6000);
+      }
+
       return {
         success: false,
         card,
+        topDiscard,
         penaltyCard,
-        message: `Errou! A carta era ${card.value}${card.suit} e o descarte é ${topDiscard.value}. Recebeu +1 carta de penalidade.`,
+        message: `Errou! Sua carta era ${card.value}${card.suit} e o descarte é ${topDiscard.value}${topDiscard.suit}. Você comprou +1 carta de penalidade do monte!`,
         newCount: player.hand.length,
       };
     }

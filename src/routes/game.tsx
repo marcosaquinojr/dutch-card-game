@@ -62,6 +62,7 @@ function Game() {
   const [chatInput, setChatInput] = useState("");
   const [modalKind, setModalKind] = useState<SpecialKind | null>(null);
   const [showRules, setShowRules] = useState(false);
+  const [activeMatchModal, setActiveMatchModal] = useState<any>(null);
 
   // Reage a efeitos especiais pendentes (Q ou J descartados)
   useEffect(() => {
@@ -76,14 +77,17 @@ function Game() {
     }
   }, [pendingEffect]);
 
-  // Notificações de Snap / Descarte Igual
+  // Notificações e Animação de Snap / Descarte Igual
   useEffect(() => {
     if (matchResult) {
+      setActiveMatchModal(matchResult);
       if (matchResult.success) {
         toast.success(matchResult.message, { icon: "⚡" });
       } else {
         toast.error(matchResult.message, { icon: "❌" });
       }
+      const timer = setTimeout(() => setActiveMatchModal(null), 5000);
+      return () => clearTimeout(timer);
     }
   }, [matchResult]);
 
@@ -543,6 +547,87 @@ function Game() {
                 Entendi
               </button>
             </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Modal de Revelação do Descarte Igual (Snap) */}
+      <AnimatePresence>
+        {activeMatchModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 grid place-items-center bg-black/85 backdrop-blur-md px-4"
+          >
+            <motion.div
+              initial={{ scale: 0.85, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.85, y: 20 }}
+              transition={{ type: "spring", stiffness: 240, damping: 22 }}
+              className={cn(
+                "glass-strong relative w-full max-w-sm rounded-3xl p-6 text-center border shadow-2xl space-y-4",
+                activeMatchModal.success
+                  ? "border-[color:var(--neon)] glow-neon bg-emerald-950/50"
+                  : "border-red-500/50 glow-red bg-rose-950/50",
+              )}
+            >
+              <div className="text-center space-y-1">
+                <div
+                  className={cn(
+                    "text-xs font-black uppercase tracking-widest flex items-center justify-center gap-1.5",
+                    activeMatchModal.success ? "text-[color:var(--neon)]" : "text-red-400",
+                  )}
+                >
+                  <Zap className="h-4 w-4 fill-current" />
+                  {activeMatchModal.success ? "Acertou o Par!" : "Errou o Par!"}
+                </div>
+                <h3 className="font-display text-xl font-bold text-white">
+                  {activeMatchModal.playerId === me?.id ? "Você tentou o Snap" : `${activeMatchModal.playerName} tentou o Snap`}
+                </h3>
+              </div>
+
+              {/* Comparação das Cartas */}
+              <div className="flex items-center justify-center gap-4 py-2">
+                <div className="flex flex-col items-center gap-1">
+                  <span className="text-[10px] uppercase font-bold text-white/60">Sua Carta</span>
+                  <PlayingCard card={activeMatchModal.card} size="md" />
+                </div>
+                <div className="text-lg font-black text-white/40">
+                  {activeMatchModal.success ? "=" : "≠"}
+                </div>
+                <div className="flex flex-col items-center gap-1">
+                  <span className="text-[10px] uppercase font-bold text-white/60">Topo do Descarte</span>
+                  <PlayingCard card={activeMatchModal.topDiscard} size="md" />
+                </div>
+              </div>
+
+              {/* Mensagem e Consequência */}
+              <div
+                className={cn(
+                  "rounded-2xl p-3 text-xs font-semibold",
+                  activeMatchModal.success
+                    ? "bg-emerald-500/20 text-emerald-200 border border-emerald-500/30"
+                    : "bg-red-500/20 text-red-200 border border-red-500/30",
+                )}
+              >
+                {activeMatchModal.success ? (
+                  <p>🎉 <strong>Acerto perfeito!</strong> A carta foi descartada. Sua grade agora tem apenas <strong>{activeMatchModal.newCount}</strong> carta(s).</p>
+                ) : (
+                  <p>⚠️ <strong>Penalidade!</strong> As cartas eram diferentes ({activeMatchModal.card.value} ≠ {activeMatchModal.topDiscard.value}). Você comprou <strong>+1 carta de penalidade</strong> do monte!</p>
+                )}
+              </div>
+
+              <button
+                onClick={() => setActiveMatchModal(null)}
+                className={cn(
+                  "w-full rounded-full py-2.5 font-display text-xs font-bold text-black cursor-pointer transition-all",
+                  activeMatchModal.success ? "gradient-neon" : "bg-white hover:bg-white/90",
+                )}
+              >
+                Continuar
+              </button>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>

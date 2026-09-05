@@ -144,7 +144,17 @@ export interface ServerToClientEvents {
   'game:dutch-called': (data: { playerId: string; playerName: string }) => void;
   'game:round-end': (data: { results: RoundResult[] }) => void;
   'game:end': (data: { results: RoundResult[]; winnerId: string }) => void;
-  'game:match-result': (data: { playerId: string; playerName: string; success: boolean; message: string; card?: CardModel }) => void;
+  'game:match-result': (data: {
+    playerId: string;
+    playerName: string;
+    handIndex: number;
+    success: boolean;
+    message: string;
+    card: CardModel;
+    topDiscard: CardModel;
+    penaltyCard?: CardModel;
+    newCount: number;
+  }) => void;
   'game:effect-pending': (data: { effect: 'queen-peek' | 'jack-swap'; cardValue: string }) => void;
   'chat:new': (data: ChatMessage) => void;
   'player:joined': (data: ClientPlayer) => void;

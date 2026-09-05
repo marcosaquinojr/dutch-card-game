@@ -406,20 +406,26 @@ export function registerSocketHandlers(io: TypedServer): void {
 
       const result = GameEngine.matchDiscard(room, player.id, data.handIndex);
 
-      io.to(room.code).emit('game:match-result', {
-        playerId: player.id,
-        playerName: player.name,
-        success: result.success,
-        message: result.message,
-        card: result.card,
-      });
+      if (result.card && result.topDiscard) {
+        io.to(room.code).emit('game:match-result', {
+          playerId: player.id,
+          playerName: player.name,
+          handIndex: data.handIndex,
+          success: result.success,
+          message: result.message,
+          card: result.card,
+          topDiscard: result.topDiscard,
+          penaltyCard: result.penaltyCard,
+          newCount: result.newCount,
+        });
+      }
 
       const matchMsg: ChatMessage = {
         id: crypto.randomUUID(),
         author: 'Sistema',
         text: result.success
-          ? `⚡ ${player.name} ACERTOU o descarte igual (${result.card?.value}) e agora tem ${result.newCount} carta(s)!`
-          : `❌ ${player.name} ERROU o descarte igual e recebeu +1 carta de penalidade!`,
+          ? `⚡ ${player.name} ACERTOU o descarte igual (${result.card?.value}${result.card?.suit}) e agora tem ${result.newCount} carta(s)!`
+          : `❌ ${player.name} ERROU o descarte igual! Carta: ${result.card?.value}${result.card?.suit} (era ${result.topDiscard?.value}${result.topDiscard?.suit}). Recebeu +1 carta de penalidade!`,
         time: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
         system: true,
       };
