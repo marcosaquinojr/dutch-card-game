@@ -17,7 +17,7 @@ export const Route = createFileRoute("/tutorial")({
 
 const STEPS = [
   { Icon: Flag, title: "Objetivo", body: "Termine a rodada com a menor soma de pontos. O primeiro a atingir a pontuação máxima perde a partida." },
-  { Icon: Layers, title: "Cartas & pontos", body: "Cartas numéricas valem seu número. J = 11, Q = 12, K = 0, Coringa = -1." },
+  { Icon: Layers, title: "Cartas & pontos", body: "Cartas numéricas valem seu número. Ás = 1 pt, J = 11, Q = 12, Reis Pretos (♠, ♣) = -1 pt, Reis Vermelhos = 13 pts." },
   { Icon: Eye, title: "Memória", body: "Você só vê algumas de suas cartas no início. Depois todas ficam viradas — memorize bem!" },
   { Icon: Sparkles, title: "Cartas especiais", body: "Algumas cartas dão poderes ao serem descartadas: olhar, revelar ou trocar." },
   { Icon: Repeat2, title: "Trocar & descartar", body: "No seu turno: compre uma carta e escolha se troca por uma sua ou descarta." },

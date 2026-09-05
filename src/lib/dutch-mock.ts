@@ -1,5 +1,5 @@
 export type Suit = "♠" | "♥" | "♦" | "♣";
-export type CardValue = "A" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "10" | "J" | "Q" | "K" | "JOKER";
+export type CardValue = "A" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "10" | "J" | "Q" | "K";
 
 export interface CardModel {
   id: string;
@@ -33,12 +33,14 @@ const AVATARS = [
 const SUITS: Suit[] = ["♠", "♥", "♦", "♣"];
 const VALUES: CardValue[] = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
 
-function pointsFor(v: CardValue): number {
+function pointsFor(v: CardValue, s?: Suit): number {
   if (v === "A") return 1;
   if (v === "J") return 11;
   if (v === "Q") return 12;
-  if (v === "K") return 0; // Dutch: K = 0
-  if (v === "JOKER") return -1;
+  if (v === "K") {
+    if (s === "♠" || s === "♣") return -1;
+    return 13;
+  }
   return parseInt(v, 10);
 }
 

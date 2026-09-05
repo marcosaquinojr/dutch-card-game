@@ -9,7 +9,6 @@ import * as crypto from 'crypto';
  * - Dama (Q) = 12 pt
  * - Reis Pretos (K♠, K♣) = -1 pt!
  * - Reis Vermelhos (K♥, K♦) = 13 pt
- * - Coringa = -1 pt
  */
 export function pointsFor(value: CardValue, suit?: Suit): number {
   if (value === 'A') return 1;
@@ -19,12 +18,11 @@ export function pointsFor(value: CardValue, suit?: Suit): number {
     if (suit === '♠' || suit === '♣') return -1;
     return 13;
   }
-  if (value === 'JOKER') return -1;
   return parseInt(value, 10);
 }
 
 /**
- * Cria um baralho de 54 cartas (52 padrão + 2 coringas) com regras clássicas do Dutch.
+ * Cria um baralho padrão de 52 cartas com regras clássicas do Dutch (sem coringas).
  */
 export function createDeck(includeSpecials: boolean): CardModel[] {
   const suits: Suit[] = ['♠', '♥', '♦', '♣'];
@@ -49,17 +47,6 @@ export function createDeck(includeSpecials: boolean): CardModel[] {
       
       deck.push(card);
     }
-  }
-
-  // Adiciona 2 coringas (-1 pt)
-  for (let i = 0; i < 2; i++) {
-    const joker: CardModel = {
-      id: crypto.randomUUID(),
-      value: 'JOKER',
-      suit: i === 0 ? '♠' : '♥',
-      points: pointsFor('JOKER'),
-    };
-    deck.push(joker);
   }
 
   return deck;
