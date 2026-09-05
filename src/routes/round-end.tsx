@@ -177,7 +177,13 @@ function RoundEnd() {
           {resultsList.map((p: any, i: number) => {
             const isWinner = p.playerId === winner.playerId;
             const handCards = p.hand || [];
-            const isDutchCaller = p.bonusOrPenalty !== 0 || (gameState?.dutchCallerId === p.playerId);
+            const cardSum = handCards.reduce(
+              (sum: number, c: any) => sum + (typeof c?.points === "number" ? c.points : 0),
+              0
+            );
+            const bonus = typeof p.bonusOrPenalty === "number" ? p.bonusOrPenalty : 0;
+            const roundScore = typeof p.roundTotal === "number" ? p.roundTotal : cardSum + bonus;
+            const isDutchCaller = bonus !== 0 || (gameState?.dutchCallerId === p.playerId);
 
             return (
               <motion.div
@@ -237,45 +243,66 @@ function RoundEnd() {
                 </div>
 
                 {/* Column 2: Revealed Hand Cards */}
-                <div className="flex flex-wrap items-center gap-3 w-full py-1">
-                  {handCards.length === 0 ? (
-                    <div className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 text-xs font-black">
-                      <Sparkles className="h-4 w-4" /> Sem cartas na mão (todas descartadas!)
-                    </div>
-                  ) : (
-                    handCards.map((c: any, cardIdx: number) => (
-                      <div key={c.id || cardIdx} className="flex flex-col items-center gap-1">
-                        <motion.div
-                          initial={{ scale: 0.8, opacity: 0 }}
-                          animate={{ scale: 1, opacity: 1 }}
-                          transition={{ delay: 0.15 + cardIdx * 0.05 }}
-                        >
-                          <PlayingCard card={c} size="md" faceDown={false} />
-                        </motion.div>
-                        <span
-                          className={cn(
-                            "text-[10px] font-bold px-1.5 py-0.5 rounded",
-                            isWinner ? "bg-black/20 text-black" : "bg-white/10 text-white/70"
-                          )}
-                        >
-                          {c.points} {c.points === 1 || c.points === -1 ? "pt" : "pts"}
-                        </span>
+                <div className="flex flex-col gap-1 w-full py-1">
+                  <div className={cn("text-[10px] font-bold uppercase tracking-wider", isWinner ? "text-black/70" : "text-white/50")}>
+                    {handCards.length === 0 ? "Cartas da Mão" : `Cartas Reveladas (Soma: ${cardSum} pts)`}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-3">
+                    {handCards.length === 0 ? (
+                      <div className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 text-xs font-black">
+                        <Sparkles className="h-4 w-4" /> Sem cartas na mão (todas descartadas!)
                       </div>
-                    ))
-                  )}
+                    ) : (
+                      handCards.map((c: any, cardIdx: number) => (
+                        <div key={c.id || cardIdx} className="flex flex-col items-center gap-1">
+                          <motion.div
+                            initial={{ scale: 0.8, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            transition={{ delay: 0.15 + cardIdx * 0.05 }}
+                          >
+                            <PlayingCard card={c} size="md" faceDown={false} />
+                          </motion.div>
+                          <span
+                            className={cn(
+                              "text-[10px] font-bold px-1.5 py-0.5 rounded",
+                              isWinner ? "bg-black/20 text-black" : "bg-white/10 text-white/70"
+                            )}
+                          >
+                            {c.points} {c.points === 1 || c.points === -1 ? "pt" : "pts"}
+                          </span>
+                        </div>
+                      ))
+                    )}
+                  </div>
                 </div>
 
-                {/* Column 3: Score */}
-                <div className="text-right w-full md:w-auto flex md:flex-col justify-between items-center md:items-end border-t md:border-t-0 pt-2 md:pt-0 border-white/10">
+                {/* Column 3: Score Breakdown */}
+                <div className="text-right w-full md:w-auto flex md:flex-col justify-between items-center md:items-end border-t md:border-t-0 pt-2 md:pt-0 border-white/10 min-w-[150px]">
                   <div>
                     <div className={cn("text-[10px] uppercase tracking-widest font-bold", isWinner ? "text-black/70" : "text-white/50")}>
                       Pontos Rodada
                     </div>
-                    <div className={cn("font-display text-3xl font-black leading-tight", isWinner ? "text-black" : "text-white")}>
-                      {p.roundTotal}
+                    <div className={cn("text-3xl font-black tabular-nums font-sans leading-tight", isWinner ? "text-black" : "text-white")}>
+                      {roundScore} <span className="text-sm font-bold">pts</span>
                     </div>
+
+                    {/* Breakdown detalhado da conta */}
+                    {bonus < 0 ? (
+                      <div className={cn("text-[11px] font-bold mt-0.5 whitespace-nowrap", isWinner ? "text-emerald-950 font-black" : "text-emerald-400")}>
+                        {cardSum} pts <span className="underline">- 5 (Bônus Dutch)</span> = {roundScore} pts
+                      </div>
+                    ) : bonus > 0 ? (
+                      <div className={cn("text-[11px] font-bold mt-0.5 whitespace-nowrap", isWinner ? "text-red-950 font-black" : "text-red-400")}>
+                        {cardSum} pts <span className="underline">+ 10 (Penalidade)</span> = {roundScore} pts
+                      </div>
+                    ) : (
+                      <div className={cn("text-[11px] font-medium mt-0.5 whitespace-nowrap", isWinner ? "text-black/70" : "text-white/60")}>
+                        {cardSum} pts nas cartas
+                      </div>
+                    )}
                   </div>
-                  <div className={cn("text-xs font-semibold", isWinner ? "text-black/80" : "text-white/60")}>
+
+                  <div className={cn("text-xs font-semibold mt-1", isWinner ? "text-black/80" : "text-white/60")}>
                     Total do Jogo: <span className="font-bold">{p.cumulativeScore} pts</span>
                   </div>
                 </div>

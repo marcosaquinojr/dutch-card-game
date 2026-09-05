@@ -32,6 +32,113 @@ function emitRoomStateToAll(io: TypedServer, room: GameRoom): void {
   io.to(room.code).emit('room:state', state);
 }
 
+const botMatchTimers = new Map<string, NodeJS.Timeout[]>();
+
+function clearBotMatchTimers(roomCode: string): void {
+  const timers = botMatchTimers.get(roomCode);
+  if (timers) {
+    timers.forEach((t) => clearTimeout(t));
+    botMatchTimers.delete(roomCode);
+  }
+}
+
+/** Verifica se bots têm cartas iguais à do descarte para descartar fora do turno (Snap) */
+function triggerBotMatchDiscards(io: TypedServer, room: GameRoom): void {
+  if (room.phase !== 'playing' && room.phase !== 'dutch-called') return;
+  if (!room.settings.simultaneousDiscard) return;
+
+  clearBotMatchTimers(room.code);
+
+  const topDiscard = room.discardPile[room.discardPile.length - 1];
+  if (!topDiscard) return;
+
+  const roomTimers: NodeJS.Timeout[] = [];
+
+  for (const bot of room.players) {
+    if (!bot.isBot || room.lockedPlayerIds.includes(bot.id) || bot.hand.length === 0) continue;
+
+    // Encontra cartas com o mesmo valor que a do descarte
+    const matchingIndices: number[] = [];
+    bot.hand.forEach((card, idx) => {
+      if (card.value === topDiscard.value) {
+        matchingIndices.push(idx);
+      }
+    });
+
+    if (matchingIndices.length === 0) continue;
+
+    // Prioriza cartas que o bot já conhece (memorizadas no início ou reveladas)
+    const knownMatch = matchingIndices.find((idx) => bot.knownCards.includes(idx));
+    let chosenIndex: number | undefined = knownMatch;
+
+    // Se não conhece, tem 20% de chance de arriscar (comportamento humano realista)
+    if (chosenIndex === undefined && Math.random() < 0.20) {
+      chosenIndex = matchingIndices[0];
+    }
+
+    if (chosenIndex === undefined) continue;
+
+    // Tempo de reação humano simulado: 1.4s a 2.8s
+    const reactionDelay = 1400 + Math.random() * 1400;
+
+    const timer = setTimeout(() => {
+      if (room.phase !== 'playing' && room.phase !== 'dutch-called') return;
+      if (room.lockedPlayerIds.includes(bot.id)) return;
+
+      const currentTop = room.discardPile[room.discardPile.length - 1];
+      if (!currentTop || currentTop.id !== topDiscard.id) return; // Topo já mudou
+      if (chosenIndex! >= bot.hand.length || bot.hand[chosenIndex!].value !== currentTop.value) return;
+
+      const result = GameEngine.matchDiscard(room, bot.id, chosenIndex!);
+      if (result.success && result.card && result.topDiscard) {
+        io.to(room.code).emit('game:match-result', {
+          playerId: bot.id,
+          playerName: bot.name,
+          handIndex: chosenIndex!,
+          success: true,
+          message: `${bot.name} (Bot) descartou uma carta igual (${result.card.value}${result.card.suit})!`,
+        });
+
+        const matchMsg: ChatMessage = {
+          id: crypto.randomUUID(),
+          author: 'Sistema',
+          text: `⚡ ${bot.name} (Bot) ACERTOU o descarte igual (${result.card.value}${result.card.suit}) e agora tem ${result.newCount} carta(s)!`,
+          time: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+          system: true,
+        };
+        io.to(room.code).emit('chat:new', matchMsg);
+
+        if (result.newCount === 0 || (room.phase as string) === 'round-end') {
+          const winMsg: ChatMessage = {
+            id: crypto.randomUUID(),
+            author: 'Sistema',
+            text: `🏆 ${bot.name} DESCARTOU TODAS AS SUAS CARTAS E VENCEU A RODADA COM 0 PONTOS!`,
+            time: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+            system: true,
+          };
+          io.to(room.code).emit('chat:new', winMsg);
+
+          handleRoundEnd(io, room, {
+            winnerId: bot.id,
+            winnerName: bot.name,
+            reason: `${bot.name} descartou todas as cartas e venceu a rodada com 0 pontos!`,
+          });
+          return;
+        }
+
+        emitGameStateToAll(io, room);
+        triggerBotMatchDiscards(io, room);
+      }
+    }, reactionDelay);
+
+    roomTimers.push(timer);
+  }
+
+  if (roomTimers.length > 0) {
+    botMatchTimers.set(room.code, roomTimers);
+  }
+}
+
 /** IA / Jogada Simulada do Bot */
 function checkBotTurn(io: TypedServer, room: GameRoom): void {
   if (room.phase !== 'playing' && room.phase !== 'dutch-called') return;
@@ -138,6 +245,7 @@ function checkBotTurn(io: TypedServer, room: GameRoom): void {
       } else {
         emitGameStateToAll(io, room);
         startTurnTimer(io, room);
+        triggerBotMatchDiscards(io, room);
       }
     }, 1300);
   }, 1600);
@@ -175,6 +283,7 @@ function clearTurnTimer(room: GameRoom): void {
 /** Lida com o fim de rodada: calcula resultados, aplica scores, verifica game end */
 function handleRoundEnd(io: TypedServer, room: GameRoom, extraInfo?: { winnerId?: string; winnerName?: string; reason?: string }): void {
   clearTurnTimer(room);
+  clearBotMatchTimers(room.code);
 
   // Calcula resultados da rodada (já inclui bônus Dutch)
   const results = calculateRoundResults(room);
@@ -412,6 +521,7 @@ export function registerSocketHandlers(io: TypedServer): void {
         emitRoomStateToAll(io, room);
         emitGameStateToAll(io, room);
         startTurnTimer(io, room);
+        triggerBotMatchDiscards(io, room);
       }, 5000);
     });
 
@@ -460,6 +570,7 @@ export function registerSocketHandlers(io: TypedServer): void {
         } else {
           emitGameStateToAll(io, room);
           startTurnTimer(io, room);
+          triggerBotMatchDiscards(io, room);
         }
       }
     });
@@ -490,6 +601,7 @@ export function registerSocketHandlers(io: TypedServer): void {
         } else {
           emitGameStateToAll(io, room);
           startTurnTimer(io, room);
+          triggerBotMatchDiscards(io, room);
         }
       }
     });
@@ -676,6 +788,7 @@ export function registerSocketHandlers(io: TypedServer): void {
       }
 
       emitGameStateToAll(io, room);
+      triggerBotMatchDiscards(io, room);
     });
 
     // Bater na mesa / chamar Dutch
@@ -730,6 +843,7 @@ export function registerSocketHandlers(io: TypedServer): void {
         GameEngine.endMemorize(room);
         emitGameStateToAll(io, room);
         startTurnTimer(io, room);
+        triggerBotMatchDiscards(io, room);
       }, 5000);
     });
 
