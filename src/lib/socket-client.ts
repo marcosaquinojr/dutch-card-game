@@ -229,6 +229,7 @@ export function useGame() {
   );
   const [matchResult, setMatchResult] = useState<any>(null);
   const [dutchAlert, setDutchAlert] = useState<{ playerId: string; playerName: string } | null>(null);
+  const [swapEvent, setSwapEvent] = useState<any>(null);
 
   useEffect(() => {
     const s = connectSocket();
@@ -261,11 +262,13 @@ export function useGame() {
     const handleEffectPending = (data: { effect: 'queen-peek' | 'jack-swap'; cardValue: string }) => setPendingEffect(data);
     const handleMatchResult = (data: any) => setMatchResult(data);
     const handleDutchCalled = (data: { playerId: string; playerName: string }) => setDutchAlert(data);
+    const handleSwapEvent = (data: any) => setSwapEvent(data);
 
     s.on('game:card-drawn', handleCardDrawn as any);
     s.on('game:effect-pending', handleEffectPending);
     s.on('game:match-result', handleMatchResult);
     s.on('game:dutch-called', handleDutchCalled);
+    s.on('game:swap-event', handleSwapEvent as any);
 
     return () => {
       gameListeners.delete(handleUpdate);
@@ -275,6 +278,7 @@ export function useGame() {
       s.off('game:effect-pending', handleEffectPending);
       s.off('game:match-result', handleMatchResult);
       s.off('game:dutch-called', handleDutchCalled);
+      s.off('game:swap-event', handleSwapEvent as any);
     };
   }, []);
 
@@ -383,6 +387,8 @@ export function useGame() {
     matchResult,
     dutchAlert,
     clearDutchAlert: () => setDutchAlert(null),
+    swapEvent,
+    clearSwapEvent: () => setSwapEvent(null),
     roundResults,
     gameResults,
     drawFromDeck,

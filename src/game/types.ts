@@ -163,6 +163,21 @@ export interface ServerToClientEvents {
     newCount: number;
   }) => void;
   'game:effect-pending': (data: { effect: 'queen-peek' | 'jack-swap'; cardValue: string }) => void;
+  'game:swap-event': (data: {
+    type: 'drawn-swap' | 'jack-swap';
+    playerId: string;
+    playerName: string;
+    handIndex?: number;
+    drawnCard?: CardModel;
+    discardedCard?: CardModel;
+    player1Id?: string;
+    player1Name?: string;
+    cardIndex1?: number;
+    player2Id?: string;
+    player2Name?: string;
+    cardIndex2?: number;
+    description: string;
+  }) => void;
   'chat:new': (data: ChatMessage) => void;
   'player:joined': (data: ClientPlayer) => void;
   'player:left': (data: { playerId: string }) => void;

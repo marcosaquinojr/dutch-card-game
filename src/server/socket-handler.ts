@@ -213,7 +213,29 @@ function checkBotTurn(io: TypedServer, room: GameRoom): void {
           }
         }
 
+        const drawnCard = drawn;
+        const discardedCard = currentP.hand[chosenIdx];
         const { effect } = GameEngine.swapDrawnWithHand(room, currentP.id, chosenIdx);
+
+        // Notifica a mesa sobre qual carta o bot comprou e qual carta descartou
+        io.to(room.code).emit('game:swap-event', {
+          type: 'drawn-swap',
+          playerId: currentP.id,
+          playerName: currentP.name,
+          handIndex: chosenIdx,
+          drawnCard,
+          discardedCard,
+          description: `🔄 ${currentP.name} comprou ${drawnCard.value}${drawnCard.suit} (${drawnCard.points} pts), colocou na Carta #${chosenIdx + 1} e descartou ${discardedCard.value}${discardedCard.suit}!`,
+        });
+
+        const swapMsg: ChatMessage = {
+          id: crypto.randomUUID(),
+          author: 'Sistema',
+          text: `🔄 ${currentP.name} comprou ${drawnCard.value}${drawnCard.suit}, colocou na Carta #${chosenIdx + 1} e descartou ${discardedCard.value}${discardedCard.suit}!`,
+          time: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+          system: true,
+        };
+        io.to(room.code).emit('chat:new', swapMsg);
 
         if (effect === 'queen-peek') {
           const unknownIdx = currentP.hand.findIndex((_, i) => !currentP.knownCards.includes(i));
@@ -222,11 +244,40 @@ function checkBotTurn(io: TypedServer, room: GameRoom): void {
           const other = room.players.find((p) => p.id !== currentP.id && !room.lockedPlayerIds.includes(p.id));
           if (other && other.hand.length > 0) {
             GameEngine.jackSwap(room, currentP.id, currentP.id, 0, other.id, 0);
+            io.to(room.code).emit('game:swap-event', {
+              type: 'jack-swap',
+              playerId: currentP.id,
+              playerName: currentP.name,
+              player1Id: currentP.id,
+              player1Name: currentP.name,
+              cardIndex1: 0,
+              player2Id: other.id,
+              player2Name: other.name,
+              cardIndex2: 0,
+              description: `🃏 ${currentP.name} usou o Valete para trocar a Carta #1 dele com a Carta #1 de ${other.name}!`,
+            });
+            const jackMsg: ChatMessage = {
+              id: crypto.randomUUID(),
+              author: 'Sistema',
+              text: `🃏 ${currentP.name} usou o Valete para trocar a Carta #1 dele com a Carta #1 de ${other.name}!`,
+              time: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+              system: true,
+            };
+            io.to(room.code).emit('chat:new', jackMsg);
           }
         }
       } else {
         // Descarta direto sem trocar
         const { effect } = GameEngine.discardDrawnCard(room, currentP.id);
+        const discardMsg: ChatMessage = {
+          id: crypto.randomUUID(),
+          author: 'Sistema',
+          text: `🗑️ ${currentP.name} comprou ${drawn.value}${drawn.suit} e descartou direto sem trocar.`,
+          time: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+          system: true,
+        };
+        io.to(room.code).emit('chat:new', discardMsg);
+
         if (effect === 'queen-peek') {
           const unknownIdx = currentP.hand.findIndex((_, i) => !currentP.knownCards.includes(i));
           if (unknownIdx !== -1) GameEngine.queenPeek(room, currentP.id, unknownIdx);
@@ -234,6 +285,26 @@ function checkBotTurn(io: TypedServer, room: GameRoom): void {
           const other = room.players.find((p) => p.id !== currentP.id && !room.lockedPlayerIds.includes(p.id));
           if (other && other.hand.length > 0) {
             GameEngine.jackSwap(room, currentP.id, currentP.id, 0, other.id, 0);
+            io.to(room.code).emit('game:swap-event', {
+              type: 'jack-swap',
+              playerId: currentP.id,
+              playerName: currentP.name,
+              player1Id: currentP.id,
+              player1Name: currentP.name,
+              cardIndex1: 0,
+              player2Id: other.id,
+              player2Name: other.name,
+              cardIndex2: 0,
+              description: `🃏 ${currentP.name} usou o Valete para trocar a Carta #1 dele com a Carta #1 de ${other.name}!`,
+            });
+            const jackMsg: ChatMessage = {
+              id: crypto.randomUUID(),
+              author: 'Sistema',
+              text: `🃏 ${currentP.name} usou o Valete para trocar a Carta #1 dele com a Carta #1 de ${other.name}!`,
+              time: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+              system: true,
+            };
+            io.to(room.code).emit('chat:new', jackMsg);
           }
         }
       }
@@ -583,10 +654,32 @@ export function registerSocketHandlers(io: TypedServer): void {
 
       if (!GameEngine.isPlayerTurn(room, player.id)) return;
 
+      const drawnCard = room.drawnCard;
       const { oldCard, effect } = GameEngine.swapDrawnWithHand(room, player.id, data.handIndex);
       if (!oldCard) return;
 
       clearTurnTimer(room);
+
+      if (drawnCard) {
+        io.to(room.code).emit('game:swap-event', {
+          type: 'drawn-swap',
+          playerId: player.id,
+          playerName: player.name,
+          handIndex: data.handIndex,
+          drawnCard,
+          discardedCard: oldCard,
+          description: `🔄 ${player.name} comprou ${drawnCard.value}${drawnCard.suit} (${drawnCard.points} pts), colocou na Carta #${data.handIndex + 1} e descartou ${oldCard.value}${oldCard.suit}!`,
+        });
+
+        const swapMsg: ChatMessage = {
+          id: crypto.randomUUID(),
+          author: 'Sistema',
+          text: `🔄 ${player.name} comprou ${drawnCard.value}${drawnCard.suit}, colocou na Carta #${data.handIndex + 1} e descartou ${oldCard.value}${oldCard.suit}!`,
+          time: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+          system: true,
+        };
+        io.to(room.code).emit('chat:new', swapMsg);
+      }
 
       if (effect === 'queen-peek') {
         socket.emit('game:effect-pending', { effect: 'queen-peek', cardValue: 'Q' });
@@ -687,10 +780,25 @@ export function registerSocketHandlers(io: TypedServer): void {
       const p1 = room.players.find((p) => p.id === data.player1Id);
       const p2 = room.players.find((p) => p.id === data.player2Id);
 
+      const swapDescription = `🃏 ${player.name} usou o Valete para trocar a Carta #${data.cardIndex1 + 1} de ${p1?.name} com a Carta #${data.cardIndex2 + 1} de ${p2?.name}!`;
+
+      io.to(room.code).emit('game:swap-event', {
+        type: 'jack-swap',
+        playerId: player.id,
+        playerName: player.name,
+        player1Id: data.player1Id,
+        player1Name: p1?.name || 'Jogador',
+        cardIndex1: data.cardIndex1,
+        player2Id: data.player2Id,
+        player2Name: p2?.name || 'Jogador',
+        cardIndex2: data.cardIndex2,
+        description: swapDescription,
+      });
+
       const swapMessage: ChatMessage = {
         id: crypto.randomUUID(),
         author: 'Sistema',
-        text: `🃏 ${player.name} usou o Valete para trocar uma carta de ${p1?.name} com ${p2?.name}!`,
+        text: swapDescription,
         time: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
         system: true,
       };

@@ -25,6 +25,13 @@ function suitColor(suit: string) {
   return suit === "♥" || suit === "♦" ? "text-rose-400" : "text-slate-100";
 }
 
+const SPECIAL_LABEL: Record<NonNullable<CardModel["special"]>, string> = {
+  peek: "Espiar 👁️",
+  swap: "Trocar 🔄",
+  reveal: "Revelar",
+  steal: "Roubar",
+};
+
 function SpecialIcon({ kind }: { kind: NonNullable<CardModel["special"]> }) {
   const Icon = kind === "peek" ? Eye : kind === "swap" ? Repeat2 : kind === "steal" ? Users : Sparkles;
   return <Icon className="h-3.5 w-3.5" />;
@@ -53,12 +60,14 @@ export function PlayingCard({ card, faceDown, size = "lg", selected, highlight, 
     setTilt({ rx: 0, ry: 0, gx: 50, gy: 50, glare: 0 });
   };
 
+  const Tag = onClick ? motion.button : motion.div;
+
   return (
-    <motion.button
-      type="button"
+    <Tag
+      type={onClick ? "button" : undefined}
       onClick={onClick}
-      onPointerMove={handlePointerMove}
-      onPointerLeave={handlePointerLeave}
+      onPointerMove={handlePointerMove as any}
+      onPointerLeave={handlePointerLeave as any}
       whileHover={onClick ? { y: -8, scale: 1.05 } : undefined}
       whileTap={onClick ? { scale: 0.96 } : undefined}
       animate={selected ? { y: -14 } : { y: 0 }}
@@ -128,7 +137,7 @@ export function PlayingCard({ card, faceDown, size = "lg", selected, highlight, 
               {card?.special ? (
                 <span className="flex items-center gap-1 rounded-full bg-white/10 px-1.5 py-0.5 text-white">
                   <SpecialIcon kind={card.special} />
-                  {card.special}
+                  {SPECIAL_LABEL[card.special]}
                 </span>
               ) : (
                 <span className="opacity-60">{card?.points}pt</span>
@@ -138,7 +147,7 @@ export function PlayingCard({ card, faceDown, size = "lg", selected, highlight, 
           </div>
         </div>
       </div>
-    </motion.button>
+    </Tag>
   );
 }
 

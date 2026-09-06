@@ -79,15 +79,29 @@ function Game() {
     skipEffect,
     callDutch,
     syncGame,
+    swapEvent,
+    clearSwapEvent,
   } = useGame();
 
   const { messages, sendMessage } = useChat();
   const [chatInput, setChatInput] = useState("");
   const [modalKind, setModalKind] = useState<SpecialKind | null>(null);
   const [showRules, setShowRules] = useState(false);
-  const [activeMatchModal, setActiveMatchModal] = useState<any>(null);
   const [mutedState, setMutedState] = useState(isSfxMuted());
   const [screenShake, setScreenShake] = useState(false);
+
+  // Notificação e destaque visual de troca de cartas (sem modal)
+  const [activeSwapNotice, setActiveSwapNotice] = useState<{
+    type: "drawn-swap" | "jack-swap";
+    description: string;
+  } | null>(null);
+  const [activeSwapHighlight, setActiveSwapHighlight] = useState<{
+    playerId?: string;
+    handIndex?: number;
+    player2Id?: string;
+    cardIndex2?: number;
+    tag?: string;
+  } | null>(null);
 
   const persistentPlayerId = typeof window !== "undefined" ? localStorage.getItem("dutch_playerId") : null;
   const playerName = (typeof window !== "undefined" ? localStorage.getItem("dutch_playerName") : null) || "Você";
@@ -160,19 +174,16 @@ function Game() {
   // Notificações e Animação de Snap / Descarte Igual com som e tremor
   useEffect(() => {
     if (matchResult) {
-      setActiveMatchModal(matchResult);
       if (matchResult.success) {
         playMatchSuccess();
-        toast.success(matchResult.message, { icon: "⚡" });
+        toast.success(matchResult.message, { icon: "⚡", duration: 4000 });
       } else {
         playMatchFail();
         setScreenShake(true);
         const t = setTimeout(() => setScreenShake(false), 400);
-        toast.error(matchResult.message, { icon: "❌" });
+        toast.error(matchResult.message, { icon: "❌", duration: 4000 });
         return () => clearTimeout(t);
       }
-      const timer = setTimeout(() => setActiveMatchModal(null), 5000);
-      return () => clearTimeout(timer);
     }
   }, [matchResult]);
 
@@ -189,6 +200,42 @@ function Game() {
       return () => clearTimeout(timer);
     }
   }, [dutchAlert]);
+
+  // Alerta e destaque visual quando qualquer participante troca uma carta (sem modal)
+  useEffect(() => {
+    if (swapEvent) {
+      playCardPlace();
+      setActiveSwapNotice({
+        type: swapEvent.type,
+        description: swapEvent.description,
+      });
+
+      if (swapEvent.type === "drawn-swap") {
+        setActiveSwapHighlight({
+          playerId: swapEvent.playerId,
+          handIndex: swapEvent.handIndex,
+          tag: `Pegou ${swapEvent.drawnCard?.value || ""}${swapEvent.drawnCard?.suit || ""}`,
+        });
+        toast.info(swapEvent.description, { icon: "🔄", duration: 5000 });
+      } else if (swapEvent.type === "jack-swap") {
+        setActiveSwapHighlight({
+          playerId: swapEvent.player1Id,
+          handIndex: swapEvent.cardIndex1,
+          player2Id: swapEvent.player2Id,
+          cardIndex2: swapEvent.cardIndex2,
+          tag: "Valete 🔄",
+        });
+        toast.warning(swapEvent.description, { icon: "🃏", duration: 6000 });
+      }
+
+      const t1 = setTimeout(() => setActiveSwapNotice(null), 5000);
+      const t2 = setTimeout(() => setActiveSwapHighlight(null), 4500);
+      return () => {
+        clearTimeout(t1);
+        clearTimeout(t2);
+      };
+    }
+  }, [swapEvent]);
 
   // Redirecionamentos de fim de rodada / jogo
   useEffect(() => {
@@ -505,6 +552,9 @@ function Game() {
                 {Array.from({ length: p.cardsCount }).map((_, cardIdx) => {
                   const isFirstSelected = jackFirstCard?.playerId === p.id && jackFirstCard?.cardIndex === cardIdx;
                   const canSelectForJack = (jackMode === "selecting-first" || jackMode === "selecting-second") && !p.isLocked;
+                  const isSwapHighlighted =
+                    (activeSwapHighlight?.playerId === p.id && activeSwapHighlight?.handIndex === cardIdx) ||
+                    (activeSwapHighlight?.player2Id === p.id && activeSwapHighlight?.cardIndex2 === cardIdx);
 
                   return (
                     <div
@@ -515,12 +565,18 @@ function Game() {
                         canSelectForJack && "cursor-pointer hover:scale-115 hover:z-20 hover:brightness-125",
                         canSelectForJack && !isFirstSelected && "ring-1 ring-yellow-400/80 shadow-[0_0_8px_rgba(250,204,21,0.5)] animate-pulse",
                         isFirstSelected && "ring-2 ring-yellow-400 scale-115 shadow-[0_0_15px_rgba(250,204,21,0.9)] z-20",
+                        isSwapHighlighted && "ring-2 ring-rose-400 scale-115 shadow-[0_0_18px_rgba(244,63,94,0.8)] z-20 animate-pulse",
                       )}
                       title={canSelectForJack ? `Selecionar carta de ${p.name}` : undefined}
                     >
                       {isFirstSelected && (
                         <span className="absolute -top-2 -right-1 text-[8px] bg-yellow-400 text-black font-black px-1 rounded-full shadow z-30 animate-bounce">
                           1ª
+                        </span>
+                      )}
+                      {isSwapHighlighted && (
+                        <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 text-[7px] bg-rose-500 text-white font-black px-1.5 py-0.5 rounded-full shadow-lg z-30 whitespace-nowrap animate-bounce border border-white/30">
+                          🔄
                         </span>
                       )}
                       <CardBack size="sm" />
@@ -728,6 +784,14 @@ function Game() {
             canMatch={!!gameState.discardTop}
             swapActive={Boolean(drawnCard || jackMode === "selecting-first" || jackMode === "selecting-second")}
             selectedIndex={jackFirstCard?.playerId === me?.id ? jackFirstCard.cardIndex : undefined}
+            swappedIndex={
+              activeSwapHighlight?.playerId === me?.id
+                ? activeSwapHighlight?.handIndex
+                : activeSwapHighlight?.player2Id === me?.id
+                  ? activeSwapHighlight?.cardIndex2
+                  : undefined
+            }
+            swappedTag={activeSwapHighlight?.tag}
             onCardClick={(index: number) => {
               if (drawnCard) {
                 handleSwapCard(index);
@@ -838,93 +902,8 @@ function Game() {
         )}
       </AnimatePresence>
 
-      {/* Modal de Revelação do Descarte Igual (Snap) */}
-      <AnimatePresence>
-        {activeMatchModal && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 grid place-items-center bg-black/85 backdrop-blur-md px-4"
-          >
-            <motion.div
-              initial={{ scale: 0.85, y: 20 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.85, y: 20 }}
-              transition={{ type: "spring", stiffness: 240, damping: 22 }}
-              className={cn(
-                "glass-strong relative w-full max-w-sm rounded-3xl p-6 text-center border shadow-2xl space-y-4",
-                activeMatchModal.success
-                  ? "border-[color:var(--neon)] glow-neon bg-emerald-950/50"
-                  : "border-red-500/50 glow-red bg-rose-950/50",
-              )}
-            >
-              <div className="text-center space-y-1">
-                <div
-                  className={cn(
-                    "text-xs font-black uppercase tracking-widest flex items-center justify-center gap-1.5",
-                    activeMatchModal.success ? "text-[color:var(--neon)]" : "text-red-400",
-                  )}
-                >
-                  <Zap className="h-4 w-4 fill-current" />
-                  {activeMatchModal.success ? "Acertou o Par!" : "Errou o Par!"}
-                </div>
-                <h3 className="font-display text-xl font-bold text-white">
-                  {activeMatchModal.playerId === me?.id ? "Você tentou o Snap" : `${activeMatchModal.playerName} tentou o Snap`}
-                </h3>
-              </div>
 
-              {/* Comparação das Cartas */}
-              <div className="flex items-center justify-center gap-4 py-2">
-                <div className="flex flex-col items-center gap-1">
-                  <span className="text-[10px] uppercase font-bold text-white/60">Sua Carta</span>
-                  <PlayingCard card={activeMatchModal.card} size="md" />
-                </div>
-                <div className="text-lg font-black text-white/40">
-                  {activeMatchModal.success ? "=" : "≠"}
-                </div>
-                <div className="flex flex-col items-center gap-1">
-                  <span className="text-[10px] uppercase font-bold text-white/60">Topo do Descarte</span>
-                  <PlayingCard card={activeMatchModal.topDiscard} size="md" />
-                </div>
-              </div>
 
-              {/* Mensagem e Consequência */}
-              <div
-                className={cn(
-                  "rounded-2xl p-3 text-xs font-semibold",
-                  activeMatchModal.success
-                    ? "bg-emerald-500/20 text-emerald-200 border border-emerald-500/30"
-                    : "bg-red-500/20 text-red-200 border border-red-500/30",
-                )}
-              >
-                {activeMatchModal.success ? (
-                  activeMatchModal.newCount === 0 ? (
-                    <div className="space-y-1 text-center">
-                      <p className="text-base font-black text-amber-300">🏆 ZEROU TODAS AS CARTAS!</p>
-                      <p>Você descartou sua última carta e venceu a rodada com 0 pontos!</p>
-                    </div>
-                  ) : (
-                    <p>🎉 <strong>Acerto perfeito!</strong> A carta foi descartada. Sua grade agora tem apenas <strong>{activeMatchModal.newCount}</strong> carta(s).</p>
-                  )
-                ) : (
-                  <p>⚠️ <strong>Penalidade!</strong> As cartas eram diferentes ({activeMatchModal.card.value} ≠ {activeMatchModal.topDiscard.value}). Você comprou <strong>+1 carta de penalidade</strong> do monte!</p>
-                )}
-              </div>
-
-              <button
-                onClick={() => setActiveMatchModal(null)}
-                className={cn(
-                  "w-full rounded-full py-2.5 font-display text-xs font-bold text-black cursor-pointer transition-all",
-                  activeMatchModal.success ? "gradient-neon" : "bg-white hover:bg-white/90",
-                )}
-              >
-                Continuar
-              </button>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       {/* Modal de Alerta Gigante e Dramático quando alguém chama DUTCH */}
       <AnimatePresence>
