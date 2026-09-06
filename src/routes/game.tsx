@@ -211,21 +211,25 @@ function Game() {
       });
 
       if (swapEvent.type === "drawn-swap") {
-        setActiveSwapHighlight({
-          playerId: swapEvent.playerId,
-          handIndex: swapEvent.handIndex,
-          tag: `Pegou ${swapEvent.drawnCard?.value || ""}${swapEvent.drawnCard?.suit || ""}`,
-        });
-        toast.info(swapEvent.description, { icon: "🔄", duration: 5000 });
+        // Apenas destaca no tabuleiro se foi outro jogador/bot quem trocou
+        if (swapEvent.playerId !== me?.id) {
+          setActiveSwapHighlight({
+            playerId: swapEvent.playerId,
+            handIndex: swapEvent.handIndex,
+            tag: `Pegou ${swapEvent.drawnCard?.value || ""}${swapEvent.drawnCard?.suit || ""}`,
+          });
+          toast.info(swapEvent.description, { icon: "🔄", duration: 4500 });
+        }
       } else if (swapEvent.type === "jack-swap") {
+        // Valete: destaca quais cartas foram trocadas entre os participantes
         setActiveSwapHighlight({
           playerId: swapEvent.player1Id,
           handIndex: swapEvent.cardIndex1,
           player2Id: swapEvent.player2Id,
           cardIndex2: swapEvent.cardIndex2,
-          tag: "Valete 🔄",
+          tag: "Troca Valete 🔄",
         });
-        toast.warning(swapEvent.description, { icon: "🃏", duration: 6000 });
+        toast.info(swapEvent.description, { icon: "🃏", duration: 5500 });
       }
 
       const t1 = setTimeout(() => setActiveSwapNotice(null), 5000);
@@ -392,7 +396,11 @@ function Game() {
           <DutchLogo size="sm" />
         </div>
 
-        <TurnIndicator name={activePlayer.name} seconds={gameState.turnTimeRemaining} />
+        <TurnIndicator
+          name={activePlayer?.name || "Jogador"}
+          seconds={gameState.turnTimeRemaining}
+          isMyTurn={isMyTurn}
+        />
 
         <div className="flex items-center gap-2">
           {/* Botão de Som Mute/Unmute */}
@@ -565,7 +573,7 @@ function Game() {
                         canSelectForJack && "cursor-pointer hover:scale-115 hover:z-20 hover:brightness-125",
                         canSelectForJack && !isFirstSelected && "ring-1 ring-yellow-400/80 shadow-[0_0_8px_rgba(250,204,21,0.5)] animate-pulse",
                         isFirstSelected && "ring-2 ring-yellow-400 scale-115 shadow-[0_0_15px_rgba(250,204,21,0.9)] z-20",
-                        isSwapHighlighted && "ring-2 ring-rose-400 scale-115 shadow-[0_0_18px_rgba(244,63,94,0.8)] z-20 animate-pulse",
+                        isSwapHighlighted && "ring-2 ring-cyan-400 scale-110 shadow-[0_0_15px_rgba(34,211,238,0.8)] z-20 animate-pulse",
                       )}
                       title={canSelectForJack ? `Selecionar carta de ${p.name}` : undefined}
                     >
@@ -575,7 +583,7 @@ function Game() {
                         </span>
                       )}
                       {isSwapHighlighted && (
-                        <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 text-[7px] bg-rose-500 text-white font-black px-1.5 py-0.5 rounded-full shadow-lg z-30 whitespace-nowrap animate-bounce border border-white/30">
+                        <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 text-[7px] bg-cyan-500 text-black font-black px-1.5 py-0.5 rounded-full shadow-lg z-30 whitespace-nowrap animate-bounce border border-cyan-300">
                           🔄
                         </span>
                       )}

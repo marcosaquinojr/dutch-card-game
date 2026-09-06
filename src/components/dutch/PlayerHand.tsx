@@ -82,15 +82,15 @@ export function PlayerHand({
                 "relative group flex flex-col items-center cursor-pointer",
                 swapActive && "ring-2 ring-[color:var(--neon)] ring-offset-2 ring-offset-black/70 rounded-xl shadow-[0_0_15px_rgba(56,189,248,0.4)] animate-pulse",
                 selectedIndex === i && "ring-2 ring-yellow-400 ring-offset-2 ring-offset-black/70 rounded-xl scale-105 shadow-[0_0_20px_rgba(250,204,21,0.8)] z-20",
-                swappedIndex === i && "ring-2 ring-rose-400 ring-offset-2 ring-offset-black/80 rounded-xl scale-110 shadow-[0_0_25px_rgba(244,63,94,0.9)] z-30 animate-pulse",
+                swappedIndex === i && "ring-2 ring-cyan-400 ring-offset-2 ring-offset-black/80 rounded-xl scale-105 shadow-[0_0_20px_rgba(34,211,238,0.8)] z-30 animate-pulse",
               )}
               onClick={() => {
                 if (onCardClick) onCardClick(i);
               }}
             >
               {swappedIndex === i && (
-                <span className="absolute -top-3.5 left-1/2 -translate-x-1/2 text-[9px] bg-rose-500 text-white font-black px-2 py-0.5 rounded-full shadow-2xl z-30 whitespace-nowrap animate-bounce border border-white/20">
-                  {swappedTag || "🚨 Trocada!"}
+                <span className="absolute -top-3.5 left-1/2 -translate-x-1/2 text-[9px] bg-cyan-500 text-black font-black px-2 py-0.5 rounded-full shadow-2xl z-30 whitespace-nowrap animate-bounce border border-cyan-300">
+                  {swappedTag || "Troca Valete 🔄"}
                 </span>
               )}
               {selectedIndex === i && swappedIndex !== i && (
