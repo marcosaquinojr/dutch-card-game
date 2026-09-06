@@ -1,48 +1,38 @@
 /**
- * Sistema de Efeitos Sonoros para o DUTCH (Web Audio API)
- * Totalmente sintetizado via Web Audio API:
- * - 0 arquivos externos ou downloads pesados
- * - Baixíssima latência (instantâneo)
- * - Funciona em qualquer navegador moderno (desktop e mobile)
+ * Sistema de Efeitos Sonoros Profissional para o DUTCH (Powered by Howler.js)
+ * - Amostras reais de estúdio de alta fidelidade (Foley de cartas, feltro de cassino e mesa de madeira)
+ * - Múltiplas variações orgânicas por ação (evita efeito monótono repetitivo)
+ * - Micro-variações de pitch/rate dinâmicas a cada toque
+ * - Baixíssima latência via Web Audio pooling da Howler.js
+ * - Suporte universal a navegadores (fallback duplo MP3 + OGG)
  */
 
-let audioCtx: AudioContext | null = null;
-
-function getAudioContext(): AudioContext | null {
-  if (typeof window === 'undefined') return null;
-  if (!audioCtx) {
-    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
-    if (AudioContextClass) {
-      audioCtx = new AudioContextClass();
-    }
-  }
-  if (audioCtx && audioCtx.state === 'suspended') {
-    audioCtx.resume().catch(() => {});
-  }
-  return audioCtx;
-}
+import { Howl, Howler } from "howler";
 
 // ── Configurações de Volume e Mudo ──
 
 export function getSfxVolume(): number {
-  if (typeof window === 'undefined') return 0.8;
-  const v = localStorage.getItem('dutch_sfx_volume');
+  if (typeof window === "undefined") return 0.8;
+  const v = localStorage.getItem("dutch_sfx_volume");
   return v !== null ? parseFloat(v) : 0.8;
 }
 
 export function setSfxVolume(vol: number): void {
-  if (typeof window === 'undefined') return;
-  localStorage.setItem('dutch_sfx_volume', Math.max(0, Math.min(1, vol)).toString());
+  if (typeof window === "undefined") return;
+  const clamped = Math.max(0, Math.min(1, vol));
+  localStorage.setItem("dutch_sfx_volume", clamped.toString());
+  Howler.volume(clamped);
 }
 
 export function isSfxMuted(): boolean {
-  if (typeof window === 'undefined') return false;
-  return localStorage.getItem('dutch_sfx_muted') === 'true';
+  if (typeof window === "undefined") return false;
+  return localStorage.getItem("dutch_sfx_muted") === "true";
 }
 
 export function setSfxMuted(muted: boolean): void {
-  if (typeof window === 'undefined') return;
-  localStorage.setItem('dutch_sfx_muted', muted ? 'true' : 'false');
+  if (typeof window === "undefined") return;
+  localStorage.setItem("dutch_sfx_muted", muted ? "true" : "false");
+  Howler.mute(muted);
 }
 
 export function toggleSfxMuted(): boolean {
@@ -51,463 +41,206 @@ export function toggleSfxMuted(): boolean {
   return next;
 }
 
-function createMasterGain(ctx: AudioContext): GainNode | null {
-  if (isSfxMuted()) return null;
-  const vol = getSfxVolume();
-  if (vol <= 0.01) return null;
-
-  const gain = ctx.createGain();
-  gain.gain.setValueAtTime(vol * 0.7, ctx.currentTime);
-  gain.connect(ctx.destination);
-  return gain;
-}
-
-// ── Geradores de Ruído e Formas de Onda ──
-
-function createNoiseBuffer(ctx: AudioContext, durationSeconds: number): AudioBuffer {
-  const bufferSize = Math.floor(ctx.sampleRate * durationSeconds);
-  const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-  const data = buffer.getChannelData(0);
-  for (let i = 0; i < bufferSize; i++) {
-    data[i] = Math.random() * 2 - 1;
+// Inicialização segura no cliente
+if (typeof window !== "undefined") {
+  try {
+    Howler.volume(getSfxVolume());
+    Howler.mute(isSfxMuted());
+  } catch (err) {
+    console.warn("Howler init warning:", err);
   }
-  return buffer;
 }
 
-// ── Sons Procedurais do Jogo ──
+// ── Cache de Instâncias Howl (Lazy Loaded para SSR Seguro) ──
+
+function createHowl(baseName: string, defaultVol = 1.0): Howl | null {
+  if (typeof window === "undefined") return null;
+  return new Howl({
+    src: [`/sounds/${baseName}.mp3`, `/sounds/${baseName}.ogg`],
+    volume: defaultVol,
+    preload: true,
+    html5: false, // usa Web Audio API para disparos instantâneos e simultâneos
+  });
+}
+
+// Conjuntos de variações orgânicas
+let cardSlideSounds: Howl[] | null = null;
+let cardPlaceSounds: Howl[] | null = null;
+let cardFlipSound: Howl | null = null;
+let snapSuccessSound: Howl | null = null;
+let snapFailSound: Howl | null = null;
+let tableSlamSound: Howl | null = null;
+let dutchBellSound: Howl | null = null;
+let yourTurnSound: Howl | null = null;
+let timerTickSound: Howl | null = null;
+let specialPowerSound: Howl | null = null;
+let roundWinSound: Howl | null = null;
+
+function getCardSlideSounds(): Howl[] {
+  if (!cardSlideSounds) {
+    cardSlideSounds = [
+      createHowl("card-slide-1", 0.95),
+      createHowl("card-slide-2", 0.95),
+      createHowl("card-slide-3", 0.95),
+    ].filter(Boolean) as Howl[];
+  }
+  return cardSlideSounds;
+}
+
+function getCardPlaceSounds(): Howl[] {
+  if (!cardPlaceSounds) {
+    cardPlaceSounds = [
+      createHowl("card-place-1", 0.9),
+      createHowl("card-place-2", 0.9),
+      createHowl("card-place-3", 0.9),
+    ].filter(Boolean) as Howl[];
+  }
+  return cardPlaceSounds;
+}
+
+// ── Efeitos Sonoros Principais ──
 
 /**
  * 1. Puxar carta do monte (Card Draw)
- * Som de atrito de papel deslizando suavemente.
+ * Som autêntico de fricção de papel e feltro, com variação sutil de timbre.
  */
 export function playCardDraw(): void {
-  const ctx = getAudioContext();
-  if (!ctx) return;
-  const master = createMasterGain(ctx);
-  if (!master) return;
-
-  const now = ctx.currentTime;
-  const dur = 0.12;
-
-  const noise = ctx.createBufferSource();
-  noise.buffer = createNoiseBuffer(ctx, dur);
-
-  const filter = ctx.createBiquadFilter();
-  filter.type = 'bandpass';
-  filter.frequency.setValueAtTime(1400, now);
-  filter.frequency.exponentialRampToValueAtTime(3200, now + dur);
-  filter.Q.setValueAtTime(2.5, now);
-
-  const gain = ctx.createGain();
-  gain.gain.setValueAtTime(0.01, now);
-  gain.gain.linearRampToValueAtTime(0.6, now + 0.03);
-  gain.gain.exponentialRampToValueAtTime(0.001, now + dur);
-
-  noise.connect(filter);
-  filter.connect(gain);
-  gain.connect(master);
-
-  noise.start(now);
-  noise.stop(now + dur);
+  if (typeof window === "undefined" || isSfxMuted()) return;
+  const list = getCardSlideSounds();
+  if (!list.length) return;
+  const sound = list[Math.floor(Math.random() * list.length)];
+  const id = sound.play();
+  sound.rate(0.95 + Math.random() * 0.1, id);
 }
 
 /**
- * 2. Espiar / Revelar Carta (Card Flip / Peek)
- * Som sutil de carta sendo levantada e virada.
- */
-export function playCardFlip(): void {
-  const ctx = getAudioContext();
-  if (!ctx) return;
-  const master = createMasterGain(ctx);
-  if (!master) return;
-
-  const now = ctx.currentTime;
-
-  const osc = ctx.createOscillator();
-  osc.type = 'sine';
-  osc.frequency.setValueAtTime(700, now);
-  osc.frequency.exponentialRampToValueAtTime(280, now + 0.08);
-
-  const oscGain = ctx.createGain();
-  oscGain.gain.setValueAtTime(0.3, now);
-  oscGain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
-
-  osc.connect(oscGain);
-  oscGain.connect(master);
-
-  osc.start(now);
-  osc.stop(now + 0.08);
-
-  const noise = ctx.createBufferSource();
-  noise.buffer = createNoiseBuffer(ctx, 0.06);
-  const filter = ctx.createBiquadFilter();
-  filter.type = 'highpass';
-  filter.frequency.setValueAtTime(2500, now);
-
-  const noiseGain = ctx.createGain();
-  noiseGain.gain.setValueAtTime(0.25, now);
-  noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.06);
-
-  noise.connect(filter);
-  filter.connect(noiseGain);
-  noiseGain.connect(master);
-
-  noise.start(now);
-  noise.stop(now + 0.06);
-}
-
-/**
- * 3. Colocar / Trocar Carta na Mesa (Card Place / Swap)
- * Som de toque amortecido do feltro da mesa ("thup").
+ * 2. Colocar carta na mesa / trocar carta (Card Place)
  */
 export function playCardPlace(): void {
-  const ctx = getAudioContext();
-  if (!ctx) return;
-  const master = createMasterGain(ctx);
-  if (!master) return;
-
-  const now = ctx.currentTime;
-
-  const osc = ctx.createOscillator();
-  osc.type = 'triangle';
-  osc.frequency.setValueAtTime(160, now);
-  osc.frequency.exponentialRampToValueAtTime(45, now + 0.09);
-
-  const gain = ctx.createGain();
-  gain.gain.setValueAtTime(0.7, now);
-  gain.gain.exponentialRampToValueAtTime(0.001, now + 0.09);
-
-  osc.connect(gain);
-  gain.connect(master);
-
-  osc.start(now);
-  osc.stop(now + 0.09);
-
-  const tap = ctx.createBufferSource();
-  tap.buffer = createNoiseBuffer(ctx, 0.02);
-  const tapFilter = ctx.createBiquadFilter();
-  tapFilter.type = 'bandpass';
-  tapFilter.frequency.setValueAtTime(2200, now);
-
-  const tapGain = ctx.createGain();
-  tapGain.gain.setValueAtTime(0.4, now);
-  tapGain.gain.exponentialRampToValueAtTime(0.001, now + 0.02);
-
-  tap.connect(tapFilter);
-  tapFilter.connect(tapGain);
-  tapGain.connect(master);
-
-  tap.start(now);
-  tap.stop(now + 0.02);
+  if (typeof window === "undefined" || isSfxMuted()) return;
+  const list = getCardPlaceSounds();
+  if (!list.length) return;
+  const sound = list[Math.floor(Math.random() * list.length)];
+  const id = sound.play();
+  sound.rate(0.96 + Math.random() * 0.08, id);
 }
 
 /**
- * 4. Descarte no Monte (Card Discard)
- * Som nítido de carta batendo no monte de descarte.
+ * 3. Virar carta / espiar (Card Flip / Peek)
+ */
+export function playCardFlip(): void {
+  if (typeof window === "undefined" || isSfxMuted()) return;
+  if (!cardFlipSound) cardFlipSound = createHowl("card-flip", 0.85);
+  if (cardFlipSound) {
+    const id = cardFlipSound.play();
+    cardFlipSound.rate(0.95 + Math.random() * 0.1, id);
+  }
+}
+
+/**
+ * 4. Descarte comum (Card Discard)
  */
 export function playCardDiscard(): void {
-  const ctx = getAudioContext();
-  if (!ctx) return;
-  const master = createMasterGain(ctx);
-  if (!master) return;
-
-  const now = ctx.currentTime;
-
-  const noise = ctx.createBufferSource();
-  noise.buffer = createNoiseBuffer(ctx, 0.1);
-  const filter = ctx.createBiquadFilter();
-  filter.type = 'bandpass';
-  filter.frequency.setValueAtTime(3000, now);
-  filter.frequency.exponentialRampToValueAtTime(1000, now + 0.1);
-
-  const noiseGain = ctx.createGain();
-  noiseGain.gain.setValueAtTime(0.5, now);
-  noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
-
-  noise.connect(filter);
-  filter.connect(noiseGain);
-  noiseGain.connect(master);
-
-  noise.start(now);
-  noise.stop(now + 0.1);
-
-  const osc = ctx.createOscillator();
-  osc.type = 'sine';
-  osc.frequency.setValueAtTime(240, now);
-  osc.frequency.exponentialRampToValueAtTime(90, now + 0.08);
-
-  const oscGain = ctx.createGain();
-  oscGain.gain.setValueAtTime(0.4, now);
-  oscGain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
-
-  osc.connect(oscGain);
-  oscGain.connect(master);
-
-  osc.start(now);
-  osc.stop(now + 0.08);
+  playCardPlace();
 }
 
 /**
- * 5. Acerto no Descarte Igual (⚡ Match Snap Success)
- * Acorde brilhante em arpeggio ascendente (E5 -> G#5 -> B5 -> E6).
+ * 5. Acerto no Descarte Igual (Snap!)
+ * Estalo rápido, brilhante e gratificante.
  */
 export function playMatchSuccess(): void {
-  const ctx = getAudioContext();
-  if (!ctx) return;
-  const master = createMasterGain(ctx);
-  if (!master) return;
-
-  const now = ctx.currentTime;
-  const notes = [659.25, 830.61, 987.77, 1318.51];
-
-  notes.forEach((freq, idx) => {
-    const osc = ctx.createOscillator();
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(freq, now + idx * 0.05);
-
-    const gain = ctx.createGain();
-    const startTime = now + idx * 0.05;
-    gain.gain.setValueAtTime(0.001, startTime);
-    gain.gain.linearRampToValueAtTime(0.4, startTime + 0.015);
-    gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.25);
-
-    osc.connect(gain);
-    gain.connect(master);
-
-    osc.start(startTime);
-    osc.stop(startTime + 0.25);
-  });
+  if (typeof window === "undefined" || isSfxMuted()) return;
+  if (!snapSuccessSound) snapSuccessSound = createHowl("snap-success", 1.0);
+  if (snapSuccessSound) {
+    const id = snapSuccessSound.play();
+    snapSuccessSound.rate(1.0 + Math.random() * 0.08, id);
+  }
 }
 
 /**
- * 6. Erro no Descarte Igual (❌ Match Snap Penalty)
- * Tom grave de alerta / penalidade.
+ * 6. Erro no Descarte Igual (Snap Fail)
+ * Impacto opaco / abafado de erro de penalidade.
  */
 export function playMatchFail(): void {
-  const ctx = getAudioContext();
-  if (!ctx) return;
-  const master = createMasterGain(ctx);
-  if (!master) return;
-
-  const now = ctx.currentTime;
-
-  const osc = ctx.createOscillator();
-  osc.type = 'sawtooth';
-  osc.frequency.setValueAtTime(180, now);
-  osc.frequency.linearRampToValueAtTime(110, now + 0.22);
-
-  const filter = ctx.createBiquadFilter();
-  filter.type = 'lowpass';
-  filter.frequency.setValueAtTime(500, now);
-
-  const gain = ctx.createGain();
-  gain.gain.setValueAtTime(0.45, now);
-  gain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
-
-  osc.connect(filter);
-  filter.connect(gain);
-  gain.connect(master);
-
-  osc.start(now);
-  osc.stop(now + 0.22);
+  if (typeof window === "undefined" || isSfxMuted()) return;
+  if (!snapFailSound) snapFailSound = createHowl("snap-fail", 0.9);
+  if (snapFailSound) {
+    snapFailSound.play();
+  }
 }
 
 /**
- * 7. Bater na Mesa / Chamar DUTCH (🚩 Dutch Call!)
- * Batida dupla firme de punho na mesa de madeira + ressonância épica.
+ * 7. Bater na Mesa / Chamar DUTCH (Dutch Call!)
+ * Pancada pesada na madeira da mesa acompanhada pelo sino de alerta de cassino.
  */
 export function playDutchCall(): void {
-  const ctx = getAudioContext();
-  if (!ctx) return;
-  const master = createMasterGain(ctx);
-  if (!master) return;
+  if (typeof window === "undefined" || isSfxMuted()) return;
+  if (!tableSlamSound) tableSlamSound = createHowl("table-slam", 1.0);
+  if (!dutchBellSound) dutchBellSound = createHowl("dutch-bell", 0.85);
 
-  const now = ctx.currentTime;
-
-  [0, 0.09].forEach((offset) => {
-    const osc = ctx.createOscillator();
-    osc.type = 'triangle';
-    osc.frequency.setValueAtTime(130, now + offset);
-    osc.frequency.exponentialRampToValueAtTime(38, now + offset + 0.12);
-
-    const gain = ctx.createGain();
-    gain.gain.setValueAtTime(0.9, now + offset);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + offset + 0.12);
-
-    osc.connect(gain);
-    gain.connect(master);
-
-    osc.start(now + offset);
-    osc.stop(now + offset + 0.12);
-  });
-
-  const gong = ctx.createOscillator();
-  gong.type = 'sine';
-  gong.frequency.setValueAtTime(440, now + 0.12);
-
-  const gongGain = ctx.createGain();
-  gongGain.gain.setValueAtTime(0.5, now + 0.12);
-  gongGain.gain.exponentialRampToValueAtTime(0.001, now + 1.4);
-
-  gong.connect(gongGain);
-  gongGain.connect(master);
-
-  gong.start(now + 0.12);
-  gong.stop(now + 1.4);
+  if (tableSlamSound) tableSlamSound.play();
+  setTimeout(() => {
+    if (dutchBellSound) dutchBellSound.play();
+  }, 70);
 }
 
 /**
- * 8. Notificação de Sua Vez (Your Turn Ping)
- * Duplo sino suave avisando que é sua vez de jogar.
+ * 8. Notificação de "Sua Vez!"
+ * Sinal sonoro discreto e agradável de cassino para alertar a vez do jogador.
  */
 export function playYourTurn(): void {
-  const ctx = getAudioContext();
-  if (!ctx) return;
-  const master = createMasterGain(ctx);
-  if (!master) return;
-
-  const now = ctx.currentTime;
-  const notes = [698.46, 880.0];
-
-  notes.forEach((freq, idx) => {
-    const osc = ctx.createOscillator();
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(freq, now + idx * 0.1);
-
-    const gain = ctx.createGain();
-    const t = now + idx * 0.1;
-    gain.gain.setValueAtTime(0.001, t);
-    gain.gain.linearRampToValueAtTime(0.35, t + 0.015);
-    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
-
-    osc.connect(gain);
-    gain.connect(master);
-
-    osc.start(t);
-    osc.stop(t + 0.35);
-  });
+  if (typeof window === "undefined" || isSfxMuted()) return;
+  if (!yourTurnSound) yourTurnSound = createHowl("your-turn", 0.8);
+  if (yourTurnSound) {
+    yourTurnSound.play();
+  }
 }
 
 /**
- * 9. Contagem Regressiva do Turno (Timer Tick)
- * Tique-taque discreto de relógio nos últimos 5 segundos.
+ * 9. Cronômetro correndo (Timer Tick)
+ * Clique tátil de ficha de poker nos segundos finais.
  */
 export function playTimerTick(): void {
-  const ctx = getAudioContext();
-  if (!ctx) return;
-  const master = createMasterGain(ctx);
-  if (!master) return;
-
-  const now = ctx.currentTime;
-
-  const osc = ctx.createOscillator();
-  osc.type = 'sine';
-  osc.frequency.setValueAtTime(1050, now);
-  osc.frequency.exponentialRampToValueAtTime(600, now + 0.025);
-
-  const gain = ctx.createGain();
-  gain.gain.setValueAtTime(0.2, now);
-  gain.gain.exponentialRampToValueAtTime(0.001, now + 0.025);
-
-  osc.connect(gain);
-  gain.connect(master);
-
-  osc.start(now);
-  osc.stop(now + 0.025);
+  if (typeof window === "undefined" || isSfxMuted()) return;
+  if (!timerTickSound) timerTickSound = createHowl("timer-tick", 0.4);
+  if (timerTickSound) {
+    const id = timerTickSound.play();
+    timerTickSound.rate(0.98 + Math.random() * 0.04, id);
+  }
 }
 
 /**
  * 10. Efeito Especial da Dama ou Valete (Special Ability)
- * Som místico brilhante de magia/habilidade.
+ * Efeito elegante de leque de cartas / flourish comemorativo.
  */
 export function playSpecialPower(): void {
-  const ctx = getAudioContext();
-  if (!ctx) return;
-  const master = createMasterGain(ctx);
-  if (!master) return;
-
-  const now = ctx.currentTime;
-  const freqs = [523.25, 659.25, 783.99, 1046.5];
-
-  freqs.forEach((f, idx) => {
-    const osc = ctx.createOscillator();
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(f, now + idx * 0.04);
-    osc.frequency.linearRampToValueAtTime(f * 1.2, now + idx * 0.04 + 0.2);
-
-    const gain = ctx.createGain();
-    const t = now + idx * 0.04;
-    gain.gain.setValueAtTime(0.001, t);
-    gain.gain.linearRampToValueAtTime(0.25, t + 0.02);
-    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
-
-    osc.connect(gain);
-    gain.connect(master);
-
-    osc.start(t);
-    osc.stop(t + 0.35);
-  });
+  if (typeof window === "undefined" || isSfxMuted()) return;
+  if (!specialPowerSound) specialPowerSound = createHowl("special-power", 0.9);
+  if (specialPowerSound) {
+    specialPowerSound.play();
+  }
 }
 
 /**
  * 11. Fanfarra de Vitória da Rodada (Round Win Fanfare)
- * Acordes comemorativos triunfantes ao vencer.
+ * Jingle acústico triunfante e festivo.
  */
 export function playRoundWin(): void {
-  const ctx = getAudioContext();
-  if (!ctx) return;
-  const master = createMasterGain(ctx);
-  if (!master) return;
-
-  const now = ctx.currentTime;
-  const fanfare = [
-    { f: 523.25, t: 0.0, d: 0.15 },
-    { f: 659.25, t: 0.14, d: 0.15 },
-    { f: 783.99, t: 0.28, d: 0.18 },
-    { f: 1046.5, t: 0.44, d: 0.6 },
-  ];
-
-  fanfare.forEach((n) => {
-    const osc = ctx.createOscillator();
-    osc.type = 'triangle';
-    osc.frequency.setValueAtTime(n.f, now + n.t);
-
-    const gain = ctx.createGain();
-    const st = now + n.t;
-    gain.gain.setValueAtTime(0.001, st);
-    gain.gain.linearRampToValueAtTime(0.45, st + 0.02);
-    gain.gain.exponentialRampToValueAtTime(0.001, st + n.d);
-
-    osc.connect(gain);
-    gain.connect(master);
-
-    osc.start(st);
-    osc.stop(st + n.d);
-  });
+  if (typeof window === "undefined" || isSfxMuted()) return;
+  if (!roundWinSound) roundWinSound = createHowl("round-win", 0.9);
+  if (roundWinSound) {
+    roundWinSound.play();
+  }
 }
 
 /**
  * 12. Toque de Botão (Button Tap)
  */
 export function playButtonTap(): void {
-  const ctx = getAudioContext();
-  if (!ctx) return;
-  const master = createMasterGain(ctx);
-  if (!master) return;
-
-  const now = ctx.currentTime;
-  const osc = ctx.createOscillator();
-  osc.type = 'sine';
-  osc.frequency.setValueAtTime(900, now);
-  osc.frequency.exponentialRampToValueAtTime(400, now + 0.02);
-
-  const gain = ctx.createGain();
-  gain.gain.setValueAtTime(0.15, now);
-  gain.gain.exponentialRampToValueAtTime(0.001, now + 0.02);
-
-  osc.connect(gain);
-  gain.connect(master);
-
-  osc.start(now);
-  osc.stop(now + 0.02);
+  if (typeof window === "undefined" || isSfxMuted()) return;
+  if (!yourTurnSound) yourTurnSound = createHowl("your-turn", 0.4);
+  if (yourTurnSound) {
+    const id = yourTurnSound.play();
+    yourTurnSound.rate(1.3, id);
+  }
 }

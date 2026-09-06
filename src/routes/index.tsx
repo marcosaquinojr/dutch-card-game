@@ -17,10 +17,10 @@ export const Route = createFileRoute("/")({
 });
 
 const MENU = [
-  { to: "/lobby", label: "Partida com Bots (Simulada)", desc: "Teste local imediato contra IA", Icon: Bot, variant: "primary" as const, search: { bots: "1" } },
-  { to: "/lobby", label: "Jogar Online", desc: "Encontrar oponentes agora", Icon: Play, variant: "gold" as const, search: { quick: "1" } },
-  { to: "/create-room", label: "Criar Sala", desc: "Configure sua partida privada", Icon: PlusCircle, variant: "purple" as const },
-  { to: "/lobby", label: "Entrar em Sala", desc: "Use um código de convite", Icon: LogIn, variant: "ghost" as const },
+  { to: "/lobby", label: "Jogar Online", desc: "Encontrar oponentes agora", Icon: Play, variant: "primary" as const, search: { quick: "1" } },
+  { to: "/create-room", label: "Criar Sala", desc: "Configure sua partida privada", Icon: PlusCircle, variant: "gold" as const },
+  { to: "/lobby", label: "Entrar em Sala", desc: "Use um código de convite", Icon: LogIn, variant: "purple" as const },
+  { to: "/lobby", label: "Partida com Bots", desc: "Treino rápido contra IA", Icon: Bot, variant: "ghost" as const, search: { bots: "1" } },
   { to: "/tutorial", label: "Tutorial", desc: "Aprenda as regras", Icon: BookOpen, variant: "ghost" as const },
   { to: "/settings", label: "Configurações", desc: "Áudio, tema e conta", Icon: Settings, variant: "ghost" as const },
 ];

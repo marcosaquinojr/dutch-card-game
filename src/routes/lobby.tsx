@@ -249,7 +249,7 @@ function Lobby() {
                 {isHost && roomState.players.length < roomState.settings.maxPlayers && (
                   <button
                     onClick={() => addBot()}
-                    className="shrink-0 flex items-center gap-2 rounded-full border border-sky-500/40 bg-sky-500/20 px-3.5 py-2 text-xs font-bold hover:bg-sky-500/30 text-sky-200 transition-all glow-sky"
+                    className="shrink-0 flex items-center gap-2 rounded-full glass border border-white/15 px-3.5 py-2 text-xs font-semibold hover:bg-white/10 text-white/80 transition-all"
                   >
                     <Bot className="h-3.5 w-3.5" /> + Bot
                   </button>
