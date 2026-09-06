@@ -16,6 +16,17 @@ import {
   RefreshCw,
   X,
   Box,
+  History,
+  Repeat2,
+  Trash2,
+  Play,
+  Eye,
+  Target,
+  Hash,
+  AlertCircle,
+  AlertTriangle,
+  Trophy,
+  Clock,
 } from "lucide-react";
 import { DutchLogo } from "@/components/dutch/DutchLogo";
 import { PlayerAvatar } from "@/components/dutch/PlayerAvatar";
@@ -90,23 +101,46 @@ function Game() {
   const [mutedState, setMutedState] = useState(isSfxMuted());
   const [screenShake, setScreenShake] = useState(false);
 
-  // Mini-histórico de jogadas no canto inferior esquerdo (sem revelar valores das cartas)
+  type HistoryType = "swap" | "dutch" | "snap" | "error" | "discard" | "start" | "peek";
+
+  // Mini-histórico de jogadas no canto inferior esquerdo (sem emojis, com ícones Lucide)
   const [historyLogs, setHistoryLogs] = useState<
     Array<{
       id: string;
       time: string;
       text: string;
       isImportant?: boolean;
-      icon?: string;
+      type: HistoryType;
     }>
   >([]);
 
-  const addHistoryLog = (text: string, isImportant = false, icon?: string) => {
+  const addHistoryLog = (text: string, isImportant = false, type: HistoryType = "swap") => {
     const time = new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
     setHistoryLogs((prev) => [
-      { id: Math.random().toString(), time, text, isImportant, icon },
+      { id: Math.random().toString(), time, text, isImportant, type },
       ...prev.slice(0, 14),
     ]);
+  };
+
+  const renderHistoryIcon = (type: HistoryType) => {
+    switch (type) {
+      case "swap":
+        return <Repeat2 className="h-3 w-3 text-cyan-400 shrink-0" />;
+      case "dutch":
+        return <Flag className="h-3 w-3 text-amber-400 shrink-0" />;
+      case "snap":
+        return <Zap className="h-3 w-3 text-yellow-400 fill-current shrink-0" />;
+      case "error":
+        return <AlertCircle className="h-3 w-3 text-rose-400 shrink-0" />;
+      case "discard":
+        return <Trash2 className="h-3 w-3 text-white/50 shrink-0" />;
+      case "start":
+        return <Play className="h-3 w-3 text-emerald-400 shrink-0" />;
+      case "peek":
+        return <Eye className="h-3 w-3 text-purple-400 shrink-0" />;
+      default:
+        return <Sparkles className="h-3 w-3 text-white/50 shrink-0" />;
+    }
   };
 
   const persistentPlayerId = typeof window !== "undefined" ? localStorage.getItem("dutch_playerId") : null;
@@ -155,7 +189,7 @@ function Game() {
   useEffect(() => {
     if (gameState?.phase === "memorize") {
       playCardFlip();
-      addHistoryLog("Rodada iniciada: memorize 2 cartas da sua mão!", false, "🏁");
+      addHistoryLog("Rodada iniciada: memorize 2 cartas da sua mão!", false, "start");
     }
   }, [gameState?.phase]);
 
@@ -165,7 +199,7 @@ function Game() {
       playSpecialPower();
       if (pendingEffect.effect === "queen-peek") {
         setModalKind("peek");
-        toast("Você descartou uma Dama (Q)! Escolha uma carta para espiar.", { icon: "👁️" });
+        toast("Você descartou uma Dama (Q)! Escolha uma carta para espiar.");
       } else if (pendingEffect.effect === "jack-swap") {
         // Para o Valete, não abre modal: pergunta na mesa se deseja trocar
         setModalKind(null);
@@ -183,14 +217,14 @@ function Game() {
     if (matchResult) {
       if (matchResult.success) {
         playMatchSuccess();
-        addHistoryLog(`${matchResult.playerName} acertou Snap e descartou!`, matchResult.playerId === me?.id, "⚡");
-        toast.success(matchResult.message, { icon: "⚡", duration: 4000 });
+        addHistoryLog(`${matchResult.playerName} acertou Snap e descartou!`, matchResult.playerId === me?.id, "snap");
+        toast.success(matchResult.message, { duration: 4000 });
       } else {
         playMatchFail();
         setScreenShake(true);
         const t = setTimeout(() => setScreenShake(false), 400);
-        addHistoryLog(`${matchResult.playerName} errou o Snap (+1 penalidade)`, matchResult.playerId === me?.id, "❌");
-        toast.error(matchResult.message, { icon: "❌", duration: 4000 });
+        addHistoryLog(`${matchResult.playerName} errou o Snap (+1 penalidade)`, matchResult.playerId === me?.id, "error");
+        toast.error(matchResult.message, { duration: 4000 });
         return () => clearTimeout(t);
       }
     }
@@ -202,10 +236,9 @@ function Game() {
       playDutchCall();
       setScreenShake(true);
       const timer = setTimeout(() => setScreenShake(false), 650);
-      addHistoryLog(`🚩 ${dutchAlert.playerName} chamou DUTCH!`, dutchAlert.playerId === me?.id, "🚩");
-      toast.warning(`🚩 ${dutchAlert.playerName} BATEU NA MESA E CHAMOU DUTCH! Última rodada!`, {
+      addHistoryLog(`${dutchAlert.playerName} chamou DUTCH!`, dutchAlert.playerId === me?.id, "dutch");
+      toast.warning(`${dutchAlert.playerName} bateu na mesa e chamou DUTCH! Última rodada!`, {
         duration: 8000,
-        icon: "🚨",
       });
       return () => clearTimeout(timer);
     }
@@ -217,10 +250,10 @@ function Game() {
       playCardPlace();
       if (swapEvent.type === "drawn-swap") {
         if (swapEvent.playerId === me?.id) {
-          addHistoryLog(`Você substituiu a sua Carta #${swapEvent.handIndex + 1}`, true, "🔄");
+          addHistoryLog(`Você substituiu a sua Carta #${swapEvent.handIndex + 1}`, true, "swap");
         } else {
-          addHistoryLog(`${swapEvent.playerName} substituiu a Carta #${swapEvent.handIndex + 1} dele`, false, "🔄");
-          toast.info(`${swapEvent.playerName} comprou do monte e substituiu uma carta da mão`, { icon: "🔄", duration: 3500 });
+          addHistoryLog(`${swapEvent.playerName} substituiu a Carta #${swapEvent.handIndex + 1} dele`, false, "swap");
+          toast.info(`${swapEvent.playerName} comprou do monte e substituiu uma carta da mão`, { duration: 3500 });
         }
       } else if (swapEvent.type === "jack-swap") {
         const wasMeP1 = swapEvent.player1Id === me?.id;
@@ -229,15 +262,15 @@ function Game() {
 
         if (wasMeP1 || wasMeP2) {
           if (isMeActor) {
-            addHistoryLog(`Você usou o Valete para trocar cartas na mesa`, true, "🃏");
+            addHistoryLog(`Você usou o Valete para trocar cartas na mesa`, true, "swap");
           } else {
             const myCard = wasMeP1 ? swapEvent.cardIndex1 : swapEvent.cardIndex2;
-            addHistoryLog(`${swapEvent.playerName} trocou uma carta com a sua Carta #${myCard + 1}!`, true, "🃏");
-            toast.warning(`🃏 ${swapEvent.playerName} trocou uma carta com a sua Carta #${myCard + 1}!`, { duration: 5000 });
+            addHistoryLog(`${swapEvent.playerName} trocou uma carta com a sua Carta #${myCard + 1}!`, true, "swap");
+            toast.warning(`${swapEvent.playerName} trocou uma carta com a sua Carta #${myCard + 1}!`, { duration: 5000 });
           }
         } else {
-          addHistoryLog(`${swapEvent.playerName} trocou cartas na mesa com o Valete`, false, "🃏");
-          toast.info(`${swapEvent.playerName} trocou cartas na mesa com o Valete`, { icon: "🃏", duration: 4000 });
+          addHistoryLog(`${swapEvent.playerName} trocou cartas na mesa com o Valete`, false, "swap");
+          toast.info(`${swapEvent.playerName} trocou cartas na mesa com o Valete`, { duration: 4000 });
         }
       }
     }
@@ -265,9 +298,10 @@ function Game() {
           <div className="flex flex-col items-center gap-3 pt-2">
             <button
               onClick={() => syncGame()}
-              className="rounded-full gradient-neon px-6 py-2.5 text-xs font-bold text-black glow-neon hover:scale-105 transition-all"
+              className="flex items-center gap-1.5 rounded-full gradient-neon px-6 py-2.5 text-xs font-bold text-black glow-neon hover:scale-105 transition-all"
             >
-              🔄 Sincronizar Partida
+              <RefreshCw className="h-3.5 w-3.5" />
+              <span>Sincronizar Partida</span>
             </button>
             <Link to="/lobby" className="inline-block text-xs text-[color:var(--neon)] underline">
               Voltar ao lobby
@@ -297,14 +331,14 @@ function Game() {
     }
     playCardDraw();
     drawFromDeck();
-    toast("Você comprou uma carta do monte", { icon: "🃏" });
+    toast("Você comprou uma carta do monte");
   };
 
   const handleDiscardDrawn = () => {
     if (!isMyTurn) return;
     playCardDiscard();
     discardDrawnCard();
-    addHistoryLog("Você comprou do monte e descartou", true, "🗑️");
+    addHistoryLog("Você comprou do monte e descartou", true, "discard");
   };
 
   const handleSwapCard = (index: number) => {
@@ -315,7 +349,7 @@ function Game() {
     }
     playCardPlace();
     swapDrawnCard(index);
-    toast.success("Carta trocada e colocada virada para baixo na sua grade! 🤫");
+    toast.success("Carta trocada e colocada virada para baixo na sua grade.");
   };
 
   const handleMatchSnap = (index: number) => {
@@ -341,8 +375,8 @@ function Game() {
     }
     playDutchCall();
     callDutch();
-    addHistoryLog("Você chamou DUTCH! 🚩", true, "🚩");
-    toast.success("Você bateu na mesa e chamou DUTCH! 🚩");
+    addHistoryLog("Você chamou DUTCH!", true, "dutch");
+    toast.success("Você bateu na mesa e chamou DUTCH!");
   };
 
   const handleCardClickForJack = (targetPlayerId: string, cardIndex: number, targetPlayerName: string) => {
@@ -352,7 +386,7 @@ function Game() {
       playCardFlip();
       setJackFirstCard({ playerId: targetPlayerId, cardIndex, playerName: targetPlayerName });
       setJackMode("selecting-second");
-      toast(`1ª carta escolhida (${targetPlayerName}, posição ${cardIndex + 1}). Agora escolha a 2ª carta! 🎯`);
+      toast(`1ª carta escolhida (${targetPlayerName}, posição ${cardIndex + 1}). Agora escolha a 2ª carta!`);
     } else if (jackMode === "selecting-second" && jackFirstCard) {
       if (jackFirstCard.playerId === targetPlayerId && jackFirstCard.cardIndex === cardIndex) {
         toast.error("Você selecionou a mesma carta! Escolha outra carta diferente para trocar.");
@@ -360,7 +394,7 @@ function Game() {
       }
       playCardPlace();
       jackSwap(jackFirstCard.playerId, jackFirstCard.cardIndex, targetPlayerId, cardIndex);
-      toast.success(`Cartas de ${jackFirstCard.playerName} e ${targetPlayerName} trocadas com sucesso! 🔄`);
+      toast.success(`Cartas de ${jackFirstCard.playerName} e ${targetPlayerName} trocadas com sucesso!`);
       setJackMode(null);
       setJackFirstCard(null);
     }
@@ -370,7 +404,7 @@ function Game() {
     skipEffect();
     setJackMode(null);
     setJackFirstCard(null);
-    toast("Efeito do Valete cancelado.", { icon: "⏭️" });
+    toast("Efeito do Valete cancelado.");
   };
 
   const handleSendMessage = (e: React.FormEvent) => {
@@ -497,11 +531,11 @@ function Game() {
           animate={{ y: 0, opacity: 1 }}
           className="relative z-20 w-full bg-gradient-to-r from-amber-600 via-yellow-500 to-amber-600 text-black py-1.5 px-4 text-center font-black text-xs uppercase tracking-wider shadow-lg flex items-center justify-center gap-2 animate-pulse"
         >
-          <span className="text-sm">🚩</span>
+          <Flag className="h-4 w-4 shrink-0" />
           <span>
-            DUTCH ATIVO: {gameState.players.find((p) => p.id === gameState.dutchCallerId)?.name || "Alguém"} BATEU NA MESA! ESTA É A ÚLTIMA RODADA PARA TODOS OS OUTROS! 🔒
+            DUTCH ATIVO: {gameState.players.find((p) => p.id === gameState.dutchCallerId)?.name || "Alguém"} BATEU NA MESA! ESTA É A ÚLTIMA RODADA PARA TODOS OS OUTROS!
           </span>
-          <span className="text-sm">🚩</span>
+          <Flag className="h-4 w-4 shrink-0" />
         </motion.div>
       )}
 
@@ -621,13 +655,13 @@ function Game() {
                     {drawnCard.value} de {drawnCard.suit} ({drawnCard.points} pts)
                   </span>
                   {drawnCard.value === "Q" && (
-                    <span className="text-[9px] font-bold text-[color:var(--neon)]">
-                      👁️ Dama: Espie uma carta ao descartar!
+                    <span className="text-[9px] font-bold text-[color:var(--neon)] flex items-center gap-1">
+                      <Eye className="h-3 w-3" /> Dama: Espie uma carta ao descartar!
                     </span>
                   )}
                   {drawnCard.value === "J" && (
-                    <span className="text-[9px] font-bold text-yellow-300">
-                      🃏 Valete: Troque 2 cartas na mesa!
+                    <span className="text-[9px] font-bold text-yellow-300 flex items-center gap-1">
+                      <Repeat2 className="h-3 w-3" /> Valete: Troque 2 cartas na mesa!
                     </span>
                   )}
                   <button
@@ -680,7 +714,7 @@ function Game() {
                 className="flex flex-col items-center gap-2 p-3 sm:p-4 rounded-2xl bg-yellow-500/15 border-2 border-yellow-400 glow-yellow shadow-2xl backdrop-blur-xl max-w-md text-center mt-3 z-30"
               >
                 <div className="flex items-center gap-1.5 text-xs sm:text-sm font-black text-yellow-300 uppercase tracking-wider">
-                  <span>🃏</span>
+                  <Repeat2 className="h-4 w-4" />
                   <span>Efeito do Valete Descartado!</span>
                 </div>
                 <p className="text-xs text-white/90">
@@ -691,7 +725,7 @@ function Game() {
                     onClick={() => {
                       setJackMode("selecting-first");
                       setJackFirstCard(null);
-                      toast("Passo 1: Clique na 1ª carta na mesa (sua ou de um oponente)", { icon: "👆" });
+                      toast("Passo 1: Clique na 1ª carta na mesa (sua ou de um oponente)");
                     }}
                     className="px-4 py-2 rounded-xl bg-yellow-400 hover:bg-yellow-300 text-black font-extrabold text-xs shadow-lg transition-all cursor-pointer flex items-center gap-1.5"
                   >
@@ -724,10 +758,10 @@ function Game() {
                     </div>
                     <div className="text-[11px] text-white/80">
                       {jackMode === "selecting-first" ? (
-                        "Clique em qualquer carta na mesa (sua grade ou de um oponente) 👆"
+                        "Clique em qualquer carta na mesa (sua grade ou de um oponente)"
                       ) : (
                         <span>
-                          1ª selecionada: <strong className="text-yellow-300">{jackFirstCard?.playerName} (Carta {(jackFirstCard?.cardIndex ?? 0) + 1})</strong>. Agora clique na 2ª carta para trocar! 🔄
+                          1ª selecionada: <strong className="text-yellow-300">{jackFirstCard?.playerName} (Carta {(jackFirstCard?.cardIndex ?? 0) + 1})</strong>. Agora clique na 2ª carta para trocar!
                         </span>
                       )}
                     </div>
@@ -748,24 +782,27 @@ function Game() {
         {/* Sua Área: Cartas dispostas lado a lado na horizontal */}
         <div className="relative z-10 flex flex-col items-center gap-1 pb-2">
           {drawnCard && (
-            <div className="text-xs font-black uppercase tracking-widest text-[color:var(--neon)] animate-bounce flex items-center gap-1 bg-black/70 px-3.5 py-1 rounded-full border border-[color:var(--neon)]/50 shadow-lg">
-              👇 Clique em uma das suas cartas para substituir 👇
+            <div className="text-xs font-black uppercase tracking-widest text-[color:var(--neon)] animate-bounce flex items-center gap-1.5 bg-black/70 px-3.5 py-1 rounded-full border border-[color:var(--neon)]/50 shadow-lg">
+              Clique em uma das suas cartas para substituir
             </div>
           )}
 
           {isMeLocked && (
             <div className="text-xs font-black uppercase tracking-widest text-amber-300 animate-pulse flex items-center gap-1.5 bg-amber-950/85 px-4 py-1.5 rounded-full border-2 border-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.6)]">
-              <Lock className="h-3.5 w-3.5 text-amber-400" /> VOCÊ BATEU NA MESA E CHAMOU DUTCH! Suas cartas estão travadas 🔒
+              <Lock className="h-3.5 w-3.5 text-amber-400" /> VOCÊ BATEU NA MESA E CHAMOU DUTCH! Suas cartas estão travadas
             </div>
           )}
 
           {jackMode && (
-            <div className="text-xs font-black uppercase tracking-widest text-yellow-300 animate-pulse flex items-center gap-1 bg-black/80 px-4 py-1.5 rounded-full border border-yellow-400/60 shadow-lg">
-              {jackMode === "prompt"
-                ? "🃏 Responda se deseja usar o poder do Valete acima"
-                : jackMode === "selecting-first"
-                  ? "🃏 Passo 1: Clique na 1ª carta (sua ou de um oponente)"
-                  : "🃏 Passo 2: Clique na 2ª carta para concluir a troca"}
+            <div className="text-xs font-black uppercase tracking-widest text-yellow-300 animate-pulse flex items-center gap-1.5 bg-black/80 px-4 py-1.5 rounded-full border border-yellow-400/60 shadow-lg">
+              <Repeat2 className="h-3.5 w-3.5 text-yellow-400 shrink-0" />
+              <span>
+                {jackMode === "prompt"
+                  ? "Responda se deseja usar o poder do Valete acima"
+                  : jackMode === "selecting-first"
+                    ? "Passo 1: Clique na 1ª carta (sua ou de um oponente)"
+                    : "Passo 2: Clique na 2ª carta para concluir a troca"}
+              </span>
             </div>
           )}
 
@@ -795,7 +832,7 @@ function Game() {
           <div className="rounded-2xl glass-strong border border-white/10 bg-black/65 backdrop-blur-xl shadow-2xl p-2.5 text-xs transition-all">
             <div className="flex items-center justify-between gap-1.5 pb-1.5 mb-1.5 border-b border-white/10">
               <span className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-white/70">
-                <span>📜</span> Histórico
+                <History className="h-3 w-3 text-[color:var(--neon)]" /> Histórico
               </span>
               <span className="text-[9px] text-white/40 font-mono">
                 {historyLogs.length > 0 ? "ao vivo" : "em espera"}
@@ -816,7 +853,7 @@ function Game() {
                         : "bg-white/5 border border-white/5 text-white/75"
                     )}
                   >
-                    <span className="shrink-0 text-xs">{log.icon || "•"}</span>
+                    <span className="shrink-0 mt-0.5">{renderHistoryIcon(log.type)}</span>
                     <span className="flex-1 min-w-0 break-words">{log.text}</span>
                     <span className="text-[8px] text-white/30 shrink-0 font-mono mt-0.5">{log.time}</span>
                   </div>
@@ -904,15 +941,35 @@ function Game() {
             <div className="glass-strong max-w-md w-full rounded-3xl p-6 border border-white/15 space-y-4">
               <div className="flex justify-between items-center border-b border-white/10 pb-3">
                 <h3 className="font-display text-lg font-bold text-[color:var(--neon)]">Regras do DUTCH</h3>
-                <button onClick={() => setShowRules(false)} className="text-white/60 hover:text-white">✕</button>
+                <button onClick={() => setShowRules(false)} className="text-white/60 hover:text-white p-1 rounded-lg transition-colors">
+                  <X className="h-4 w-4" />
+                </button>
               </div>
-              <div className="text-xs space-y-2.5 text-white/80 max-h-[60vh] overflow-y-auto pr-1">
-                <p>🎯 <strong>Objetivo</strong>: Ter a menor soma de pontos nas 4 cartas viradas para baixo à sua frente.</p>
-                <p>🔢 <strong>Valores das Cartas</strong>: Ás = 1 pt | 2 a 10 = valor nominal | Valete = 11 pts | Dama = 12 pts | <strong>Reis Pretos (♠, ♣) = 0 pts!</strong> | Reis Vermelhos (♥, ♦) = 13 pts.</p>
-                <p>👁️ <strong>Dama (Q)</strong>: Ao descartar, espie uma de suas cartas viradas para baixo.</p>
-                <p>🃏 <strong>Valete (J)</strong>: Ao descartar, troque quaisquer 2 cartas na mesa (sua com oponente, ou entre dois oponentes).</p>
-                <p>⚡ <strong>Descarte Igual (Snap)</strong>: A qualquer momento, se souber que tem uma carta igual à do topo do descarte, clique no raio ⚡ nela para descartá-la e ficar com uma carta a menos! Se errar, recebe +1 carta de penalidade.</p>
-                <p>🚩 <strong>Bater / DUTCH</strong>: Quando achar que tem a menor pontuação, bata em vez de comprar. Suas cartas ficam <strong>travadas 🔒</strong> e os outros têm mais 1 rodada!</p>
+              <div className="text-xs space-y-3 text-white/80 max-h-[60vh] overflow-y-auto pr-1">
+                <div className="flex items-start gap-2.5">
+                  <Target className="h-4 w-4 text-[color:var(--neon)] shrink-0 mt-0.5" />
+                  <p><strong>Objetivo</strong>: Ter a menor soma de pontos nas 4 cartas viradas para baixo à sua frente.</p>
+                </div>
+                <div className="flex items-start gap-2.5">
+                  <Hash className="h-4 w-4 text-cyan-400 shrink-0 mt-0.5" />
+                  <p><strong>Valores das Cartas</strong>: Ás = 1 pt | 2 a 10 = valor nominal | Valete = 11 pts | Dama = 12 pts | <strong>Reis Pretos (&spades;, &clubs;) = 0 pts!</strong> | Reis Vermelhos (&hearts;, &diams;) = 13 pts.</p>
+                </div>
+                <div className="flex items-start gap-2.5">
+                  <Eye className="h-4 w-4 text-purple-400 shrink-0 mt-0.5" />
+                  <p><strong>Dama (Q)</strong>: Ao descartar, espie uma de suas cartas viradas para baixo.</p>
+                </div>
+                <div className="flex items-start gap-2.5">
+                  <Repeat2 className="h-4 w-4 text-yellow-400 shrink-0 mt-0.5" />
+                  <p><strong>Valete (J)</strong>: Ao descartar, você pode trocar quaisquer 2 cartas na mesa (sua com oponente, ou entre dois oponentes).</p>
+                </div>
+                <div className="flex items-start gap-2.5">
+                  <Zap className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
+                  <p><strong>Descarte Igual (Snap)</strong>: A qualquer momento, se souber que tem uma carta igual à do topo do descarte, clique no botão de Snap nela para descartá-la e ficar com uma carta a menos! Se errar, recebe +1 carta de penalidade.</p>
+                </div>
+                <div className="flex items-start gap-2.5">
+                  <Flag className="h-4 w-4 text-rose-400 shrink-0 mt-0.5" />
+                  <p><strong>Bater / DUTCH</strong>: Quando achar que tem a menor pontuação, bata em vez de comprar. Suas cartas ficam <strong>travadas</strong> e os outros têm mais 1 rodada!</p>
+                </div>
               </div>
               <button
                 onClick={() => setShowRules(false)}
@@ -944,8 +1001,8 @@ function Game() {
               transition={{ type: "spring", stiffness: 260, damping: 22 }}
               className="glass-strong relative w-full max-w-md rounded-3xl p-6 sm:p-8 text-center border-2 border-amber-400 shadow-[0_0_60px_rgba(245,158,11,0.6)] space-y-4"
             >
-              <div className="mx-auto grid h-20 w-20 place-items-center rounded-3xl bg-amber-500/20 text-amber-400 border border-amber-400/50 text-4xl shadow-inner animate-bounce">
-                🚩
+              <div className="mx-auto grid h-20 w-20 place-items-center rounded-3xl bg-amber-500/20 text-amber-400 border border-amber-400/50 shadow-inner animate-bounce">
+                <Flag className="h-10 w-10 text-amber-400" />
               </div>
               <div>
                 <span className="inline-block px-3 py-1 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 text-[11px] font-black uppercase tracking-[0.25em] mb-2">
@@ -961,7 +1018,7 @@ function Game() {
                   <span>As cartas de {dutchAlert.playerName} foram TRAVADAS!</span>
                 </div>
                 <div className="flex items-center gap-2 text-white/80">
-                  <span className="text-base">⏳</span>
+                  <Clock className="h-4 w-4 shrink-0 text-amber-300" />
                   <span>
                     Todos os outros jogadores têm exatamente <strong>mais 1 último turno</strong> antes da contagem dos pontos!
                   </span>
@@ -971,7 +1028,7 @@ function Game() {
                 onClick={clearDutchAlert}
                 className="w-full rounded-2xl gradient-gold py-3.5 font-display text-sm font-black text-black shadow-lg hover:scale-105 active:scale-95 transition-all cursor-pointer"
               >
-                ENTENDI! VAMOS PARA A ÚLTIMA RODADA 🏁
+                ENTENDI! VAMOS PARA A ÚLTIMA RODADA
               </button>
             </motion.div>
           </motion.div>

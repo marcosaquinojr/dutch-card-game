@@ -26,12 +26,12 @@ export function calculateRoundResults(room: GameRoom): RoundResult[] {
     let reason: string | undefined;
 
     if (player.hand.length === 0) {
-      reason = 'Descartou todas as cartas (0 pts)! ⚡';
+      reason = 'Descartou todas as cartas (0 pts)!';
     } else if (room.dutchCallerId === player.id) {
       if (handScore === minScore) {
-        reason = 'Chamou Dutch e venceu com a menor pontuação! 🚩';
+        reason = 'Chamou Dutch e venceu com a menor pontuação!';
       } else {
-        reason = 'Chamou Dutch, mas não teve a menor pontuação ❌';
+        reason = 'Chamou Dutch, mas não teve a menor pontuação.';
       }
     }
 

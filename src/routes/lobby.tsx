@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect } from "react";
-import { ArrowLeft, Copy, MessageSquare, Play, Send, User, Share2, Bot } from "lucide-react";
+import { ArrowLeft, Copy, MessageSquare, Play, Send, User, Share2, Bot, X } from "lucide-react";
 import { DutchLogo } from "@/components/dutch/DutchLogo";
 import { PlayerAvatar } from "@/components/dutch/PlayerAvatar";
 import { Input } from "@/components/ui/input";
@@ -251,7 +251,7 @@ function Lobby() {
                     onClick={() => addBot()}
                     className="shrink-0 flex items-center gap-2 rounded-full border border-sky-500/40 bg-sky-500/20 px-3.5 py-2 text-xs font-bold hover:bg-sky-500/30 text-sky-200 transition-all glow-sky"
                   >
-                    <Bot className="h-3.5 w-3.5" /> + Bot 🤖
+                    <Bot className="h-3.5 w-3.5" /> + Bot
                   </button>
                 )}
                 <button
@@ -285,10 +285,10 @@ function Lobby() {
                     {p.isBot && isHost && (
                       <button
                         onClick={() => removeBot(p.id)}
-                        className="absolute top-2 right-2 h-6 w-6 rounded-full bg-red-500/20 text-red-300 hover:bg-red-500/40 flex items-center justify-center text-xs"
+                        className="absolute top-2 right-2 h-6 w-6 rounded-full bg-red-500/20 text-red-300 hover:bg-red-500/40 flex items-center justify-center transition-colors"
                         title="Remover Bot"
                       >
-                        ✕
+                        <X className="h-3.5 w-3.5" />
                       </button>
                     )}
                     <PlayerAvatar name={p.name} avatar={p.avatar} isHost={p.isHost} ready={p.ready} size="lg" />

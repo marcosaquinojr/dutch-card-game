@@ -102,7 +102,7 @@ function triggerBotMatchDiscards(io: TypedServer, room: GameRoom): void {
         const matchMsg: ChatMessage = {
           id: crypto.randomUUID(),
           author: 'Sistema',
-          text: `⚡ ${bot.name} (Bot) ACERTOU o descarte igual (${result.card.value}${result.card.suit}) e agora tem ${result.newCount} carta(s)!`,
+          text: `${bot.name} (Bot) acertou o descarte igual (${result.card.value}${result.card.suit}) e agora tem ${result.newCount} carta(s)!`,
           time: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
           system: true,
         };
@@ -112,7 +112,7 @@ function triggerBotMatchDiscards(io: TypedServer, room: GameRoom): void {
           const winMsg: ChatMessage = {
             id: crypto.randomUUID(),
             author: 'Sistema',
-            text: `🏆 ${bot.name} DESCARTOU TODAS AS SUAS CARTAS E VENCEU A RODADA COM 0 PONTOS!`,
+            text: `${bot.name} descartou todas as suas cartas e venceu a rodada com 0 pontos!`,
             time: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
             system: true,
           };
@@ -171,7 +171,7 @@ function checkBotTurn(io: TypedServer, room: GameRoom): void {
         const dutchMsg: ChatMessage = {
           id: crypto.randomUUID(),
           author: 'Sistema',
-          text: `🚩 ${currentP.name} (Bot) BATEU NA MESA E CHAMOU DUTCH! As cartas dele estão travadas 🔒.`,
+          text: `${currentP.name} (Bot) bateu na mesa e chamou DUTCH! As cartas dele estão travadas.`,
           time: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
           system: true,
         };
@@ -225,13 +225,13 @@ function checkBotTurn(io: TypedServer, room: GameRoom): void {
           handIndex: chosenIdx,
           drawnCard,
           discardedCard,
-          description: `🔄 ${currentP.name} comprou do monte e substituiu a Carta #${chosenIdx + 1}.`,
+          description: `${currentP.name} comprou do monte e substituiu a Carta #${chosenIdx + 1}.`,
         });
 
         const swapMsg: ChatMessage = {
           id: crypto.randomUUID(),
           author: 'Sistema',
-          text: `🔄 ${currentP.name} comprou do monte e substituiu a Carta #${chosenIdx + 1}.`,
+          text: `${currentP.name} comprou do monte e substituiu a Carta #${chosenIdx + 1}.`,
           time: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
           system: true,
         };
@@ -254,12 +254,12 @@ function checkBotTurn(io: TypedServer, room: GameRoom): void {
               player2Id: other.id,
               player2Name: other.name,
               cardIndex2: 0,
-              description: `🃏 ${currentP.name} trocou a Carta #1 dele com a Carta #1 de ${other.name}!`,
+              description: `${currentP.name} trocou a Carta #1 dele com a Carta #1 de ${other.name}.`,
             });
             const jackMsg: ChatMessage = {
               id: crypto.randomUUID(),
               author: 'Sistema',
-              text: `🃏 ${currentP.name} trocou a Carta #1 dele com a Carta #1 de ${other.name}!`,
+              text: `${currentP.name} trocou a Carta #1 dele com a Carta #1 de ${other.name}.`,
               time: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
               system: true,
             };
@@ -272,7 +272,7 @@ function checkBotTurn(io: TypedServer, room: GameRoom): void {
         const discardMsg: ChatMessage = {
           id: crypto.randomUUID(),
           author: 'Sistema',
-          text: `🗑️ ${currentP.name} comprou ${drawn.value}${drawn.suit} e descartou direto sem trocar.`,
+          text: `${currentP.name} comprou ${drawn.value}${drawn.suit} e descartou direto sem trocar.`,
           time: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
           system: true,
         };
@@ -295,12 +295,12 @@ function checkBotTurn(io: TypedServer, room: GameRoom): void {
               player2Id: other.id,
               player2Name: other.name,
               cardIndex2: 0,
-              description: `🃏 ${currentP.name} usou o Valete para trocar a Carta #1 dele com a Carta #1 de ${other.name}!`,
+              description: `${currentP.name} usou o Valete para trocar a Carta #1 dele com a Carta #1 de ${other.name}.`,
             });
             const jackMsg: ChatMessage = {
               id: crypto.randomUUID(),
               author: 'Sistema',
-              text: `🃏 ${currentP.name} usou o Valete para trocar a Carta #1 dele com a Carta #1 de ${other.name}!`,
+              text: `${currentP.name} usou o Valete para trocar a Carta #1 dele com a Carta #1 de ${other.name}.`,
               time: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
               system: true,
             };
@@ -668,13 +668,13 @@ export function registerSocketHandlers(io: TypedServer): void {
           handIndex: data.handIndex,
           drawnCard,
           discardedCard: oldCard,
-          description: `🔄 ${player.name} comprou do monte e substituiu a Carta #${data.handIndex + 1}.`,
+          description: `${player.name} comprou do monte e substituiu a Carta #${data.handIndex + 1}.`,
         });
 
         const swapMsg: ChatMessage = {
           id: crypto.randomUUID(),
           author: 'Sistema',
-          text: `🔄 ${player.name} comprou do monte e substituiu a Carta #${data.handIndex + 1}.`,
+          text: `${player.name} comprou do monte e substituiu a Carta #${data.handIndex + 1}.`,
           time: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
           system: true,
         };
@@ -780,7 +780,7 @@ export function registerSocketHandlers(io: TypedServer): void {
       const p1 = room.players.find((p) => p.id === data.player1Id);
       const p2 = room.players.find((p) => p.id === data.player2Id);
 
-      const swapDescription = `🃏 ${player.name} trocou a Carta #${data.cardIndex1 + 1} de ${p1?.name} com a Carta #${data.cardIndex2 + 1} de ${p2?.name}.`;
+      const swapDescription = `${player.name} trocou a Carta #${data.cardIndex1 + 1} de ${p1?.name} com a Carta #${data.cardIndex2 + 1} de ${p2?.name}.`;
 
       io.to(room.code).emit('game:swap-event', {
         type: 'jack-swap',
@@ -825,7 +825,7 @@ export function registerSocketHandlers(io: TypedServer): void {
         const skipMsg: ChatMessage = {
           id: crypto.randomUUID(),
           author: 'Sistema',
-          text: `🃏 ${player.name} optou por não trocar cartas com o Valete.`,
+          text: `${player.name} optou por não trocar cartas com o Valete.`,
           time: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
           system: true,
         };
@@ -869,8 +869,8 @@ export function registerSocketHandlers(io: TypedServer): void {
         id: crypto.randomUUID(),
         author: 'Sistema',
         text: result.success
-          ? `⚡ ${player.name} ACERTOU o descarte igual (${result.card?.value}${result.card?.suit}) e agora tem ${result.newCount} carta(s)!`
-          : `❌ ${player.name} ERROU o descarte igual! Carta: ${result.card?.value}${result.card?.suit} (era ${result.topDiscard?.value}${result.topDiscard?.suit}). Recebeu +1 carta de penalidade!`,
+          ? `${player.name} acertou o descarte igual (${result.card?.value}${result.card?.suit}) e agora tem ${result.newCount} carta(s)!`
+          : `${player.name} errou o descarte igual! Carta: ${result.card?.value}${result.card?.suit} (era ${result.topDiscard?.value}${result.topDiscard?.suit}). Recebeu +1 carta de penalidade.`,
         time: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
         system: true,
       };
@@ -881,7 +881,7 @@ export function registerSocketHandlers(io: TypedServer): void {
         const winMsg: ChatMessage = {
           id: crypto.randomUUID(),
           author: 'Sistema',
-          text: `🏆 ${player.name} DESCARTOU TODAS AS SUAS CARTAS E VENCEU A RODADA COM 0 PONTOS!`,
+          text: `${player.name} descartou todas as suas cartas e venceu a rodada com 0 pontos!`,
           time: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
           system: true,
         };
@@ -915,7 +915,7 @@ export function registerSocketHandlers(io: TypedServer): void {
         const dutchMsg: ChatMessage = {
           id: crypto.randomUUID(),
           author: 'Sistema',
-          text: `🚩 ${player.name} BATEU NA MESA E CHAMOU DUTCH! As cartas dele estão travadas 🔒. Todos os outros têm 1 último turno!`,
+          text: `${player.name} bateu na mesa e chamou DUTCH! As cartas dele estão travadas. Todos os outros têm 1 último turno!`,
           time: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
           system: true,
         };

@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Eye, Repeat2, Lock } from "lucide-react";
+import { X, Eye, Repeat2, Lock, Check } from "lucide-react";
 import { useState } from "react";
 import type { CardModel, ClientPlayer } from "@/game/types";
 import { CardBack } from "./PlayingCard";
@@ -126,7 +126,7 @@ export function SpecialCardModal({
             <p className="mt-2 text-xs text-white/70">
               {isPeek
                 ? "Escolha uma de suas cartas viradas para baixo para olhar por 5 segundos."
-                : "Selecione duas cartas quaisquer na mesa para trocar entre si. Cartas de quem bateu Dutch estão travadas 🔒."}
+                : "Selecione duas cartas quaisquer na mesa para trocar entre si. Cartas de quem bateu Dutch estão travadas."}
             </p>
 
             {/* Conteúdo para a Dama (Peek) */}
@@ -162,11 +162,11 @@ export function SpecialCardModal({
             {isSwap && (
               <div className="mt-6 space-y-6">
                 <div className="flex items-center justify-between text-xs font-bold text-white/80 border-b border-white/10 pb-2">
-                  <div className={cn(target1 ? "text-[color:var(--neon)]" : "text-white/40")}>
-                    Carta 1: {target1 ? "Selecionada ✓" : "Escolha..."}
+                  <div className={cn("flex items-center gap-1", target1 ? "text-[color:var(--neon)]" : "text-white/40")}>
+                    Carta 1: {target1 ? <><Check className="h-3 w-3 inline" /> Selecionada</> : "Escolha..."}
                   </div>
-                  <div className={cn(target2 ? "text-[color:var(--gold)]" : "text-white/40")}>
-                    Carta 2: {target2 ? "Selecionada ✓" : "Escolha..."}
+                  <div className={cn("flex items-center gap-1", target2 ? "text-[color:var(--gold)]" : "text-white/40")}>
+                    Carta 2: {target2 ? <><Check className="h-3 w-3 inline" /> Selecionada</> : "Escolha..."}
                   </div>
                 </div>
 

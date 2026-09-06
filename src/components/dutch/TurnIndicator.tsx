@@ -44,7 +44,7 @@ export function TurnIndicator({
             isMyTurn ? "text-[color:var(--neon)] animate-pulse" : "text-white/60"
           )}
         >
-          {isMyTurn ? "🎯 SUA VEZ!" : "Vez de"}
+          {isMyTurn ? "SUA VEZ!" : "Vez de"}
         </div>
         <div
           className={cn(

@@ -58,7 +58,7 @@ function RoundEnd() {
           bonusOrPenalty: p.isDutchCaller ? (handScore === 0 ? -5 : 0) : 0,
           roundTotal: handScore,
           cumulativeScore: p.score ?? handScore,
-          reason: hand.length === 0 ? "Descartou todas as cartas (0 pts)! ⚡" : undefined,
+          reason: hand.length === 0 ? "Descartou todas as cartas (0 pts)!" : undefined,
         };
       });
 
@@ -95,21 +95,21 @@ function RoundEnd() {
   const winnerZeroCards = winnerHand.length === 0;
   const isWinnerDutchCaller = gameState?.dutchCallerId === winner.playerId;
 
-  let victoryHeadline = "🏆 Venceu a rodada com a menor pontuação!";
+  let victoryHeadline = "Venceu a rodada com a menor pontuação!";
   let victorySubtitle = `${winner.roundTotal} ponto(s) nesta rodada`;
   let victoryBadgeType: "zero" | "dutch" | "score" = "score";
 
   if (winnerZeroCards) {
     victoryBadgeType = "zero";
-    victoryHeadline = `⚡ ${winner.playerName} descartou TODAS as cartas!`;
+    victoryHeadline = `${winner.playerName} descartou TODAS as cartas!`;
     victorySubtitle = "Zerou as cartas da mão e venceu imediatamente com 0 pontos!";
   } else if (isWinnerDutchCaller) {
     victoryBadgeType = "dutch";
-    victoryHeadline = `🚩 ${winner.playerName} pediu DUTCH e venceu!`;
+    victoryHeadline = `${winner.playerName} pediu DUTCH e venceu!`;
     victorySubtitle = `Teve a menor pontuação da mesa com ${winner.roundTotal} ponto(s)!`;
   } else if (gameState?.dutchCallerId && gameState.dutchCallerId !== winner.playerId) {
     const callerName = resultsList.find((p: any) => p.playerId === gameState.dutchCallerId)?.playerName || "Outro jogador";
-    victoryHeadline = `🎯 ${winner.playerName} venceu a rodada!`;
+    victoryHeadline = `${winner.playerName} venceu a rodada!`;
     victorySubtitle = `${callerName} pediu Dutch, mas ${winner.playerName} tinha a menor mão (${winner.roundTotal} pts)!`;
   }
 
@@ -166,8 +166,9 @@ function RoundEnd() {
           </div>
 
           {roundResults?.reason && roundResults.reason !== victorySubtitle && (
-            <p className="mt-2 text-xs md:text-sm text-white/70">
-              📌 {roundResults.reason}
+            <p className="mt-2 text-xs md:text-sm text-white/70 flex items-center justify-center gap-1.5">
+              <Sparkles className="h-3.5 w-3.5 text-amber-400 shrink-0" />
+              <span>{roundResults.reason}</span>
             </p>
           )}
         </motion.div>

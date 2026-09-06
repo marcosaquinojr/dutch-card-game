@@ -140,29 +140,13 @@ function createCardTexture(card: CardModel | null | undefined, isFaceDown: boole
     ctx.textBaseline = "middle";
     ctx.fillText(suit, w / 2, h / 2 - 10);
 
-    // Badge de Efeito Especial (Valete / Dama) ou Pontos
-    if (card?.special) {
-      const badgeText =
-        card.special === "peek" ? "👁️ ESPIAR (DAMA)" :
-        card.special === "swap" ? "🔄 TROCAR (VALETE)" : "✨ PODER";
-      ctx.fillStyle = "rgba(15, 23, 42, 0.9)";
-      ctx.beginPath();
-      ctx.roundRect(w / 2 - 140, h / 2 + 130, 280, 48, 24);
-      ctx.fill();
-
-      ctx.fillStyle = "#38bdf8";
-      ctx.font = "bold 20px sans-serif";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText(badgeText, w / 2, h / 2 + 154);
-    } else {
-      ctx.fillStyle = "rgba(100, 116, 139, 0.7)";
-      ctx.font = "bold 24px sans-serif";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      const pts = card?.points ?? 0;
-      ctx.fillText(`${pts} ${pts === 1 ? "PONTO" : "PONTOS"}`, w / 2, h / 2 + 150);
-    }
+    // Pontuação da carta no centro inferior
+    ctx.fillStyle = "rgba(100, 116, 139, 0.7)";
+    ctx.font = "bold 24px sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    const pts = card?.points ?? 0;
+    ctx.fillText(`${pts} ${pts === 1 ? "PONTO" : "PONTOS"}`, w / 2, h / 2 + 150);
   }
 
   // Borda externa

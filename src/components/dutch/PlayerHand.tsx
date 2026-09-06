@@ -49,7 +49,7 @@ export function PlayerHand({
     <div className={cn("relative flex flex-col items-center", className)}>
       {isLocked && (
         <div className="mb-2 flex items-center gap-1.5 rounded-full bg-amber-500/20 border border-amber-500/40 px-3 py-0.5 text-[11px] font-bold text-amber-300 uppercase tracking-widest backdrop-blur-md shadow-lg">
-          <Lock className="h-3 w-3" /> Mão Travada (Dutch) 🔒
+          <Lock className="h-3 w-3" /> Mão Travada (Dutch)
         </div>
       )}
 
@@ -85,7 +85,7 @@ export function PlayerHand({
             >
               {selectedIndex === i && (
                 <span className="absolute -top-2.5 -right-1 text-[9px] bg-yellow-400 text-black font-extrabold px-1.5 py-0.5 rounded-full shadow-lg z-20 animate-bounce">
-                  1ª Carta 📌
+                  1ª Carta
                 </span>
               )}
               {faceDown && !revealed ? (

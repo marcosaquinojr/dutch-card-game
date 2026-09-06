@@ -81,7 +81,7 @@ export interface ChatMessage {
 
 export const MOCK_CHAT: ChatMessage[] = [
   { id: "m1", author: "system", text: "Sala criada. Aguardando jogadores…", time: "20:14", system: true },
-  { id: "m2", author: "Larissa", text: "Boa noite pessoal 👋", time: "20:15" },
+  { id: "m2", author: "Larissa", text: "Boa noite pessoal!", time: "20:15" },
   { id: "m3", author: "Rafael", text: "Vamos que vamos", time: "20:16" },
   { id: "m4", author: "Você", text: "Bora! Boa sorte a todos", time: "20:17" },
 ];

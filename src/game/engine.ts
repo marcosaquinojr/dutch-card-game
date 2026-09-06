@@ -282,7 +282,7 @@ export class GameEngine {
         card,
         topDiscard,
         message: player.hand.length === 0
-          ? `🏆 Parabéns! Você descartou todas as suas cartas e venceu a rodada!`
+          ? `Parabéns! Você descartou todas as suas cartas e venceu a rodada!`
           : `Acertou o par! Sua carta era ${card.value}${card.suit} e foi descartada. Você agora tem ${player.hand.length} carta(s)!`,
         newCount: player.hand.length,
       };
