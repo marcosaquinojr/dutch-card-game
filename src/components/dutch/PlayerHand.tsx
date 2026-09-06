@@ -130,9 +130,9 @@ export function PlayerHand({
                     onMatchClick(i);
                   }}
                   title="Descartar esta carta se for igual ao descarte (Snap)"
-                  className="absolute -top-1.5 -right-1.5 z-20 flex h-6 w-6 items-center justify-center rounded-full bg-yellow-400 text-black shadow-lg hover:scale-115 active:scale-95 transition-all border border-black/40 cursor-pointer"
+                  className="absolute -top-2 -right-2 z-20 flex h-6 w-6 items-center justify-center rounded-full bg-black/85 hover:bg-yellow-400 text-yellow-400 hover:text-black shadow-md border border-yellow-400/50 hover:scale-115 active:scale-95 transition-all cursor-pointer backdrop-blur-sm"
                 >
-                  <Zap className="h-3.5 w-3.5 fill-current" />
+                  <Zap className="h-3 w-3 fill-current" />
                 </button>
               )}
             </motion.div>

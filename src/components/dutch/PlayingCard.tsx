@@ -2,7 +2,6 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import type { CardModel } from "@/lib/dutch-mock";
-import { Eye, Repeat2, Sparkles, Users } from "lucide-react";
 
 interface Props {
   card?: CardModel;
@@ -23,12 +22,6 @@ const SIZE = {
 
 function suitColor(suit: string) {
   return suit === "♥" || suit === "♦" ? "text-rose-400" : "text-slate-100";
-}
-
-function SpecialIcon({ kind, size = "md" }: { kind: NonNullable<CardModel["special"]>; size?: Props["size"] }) {
-  const Icon = kind === "peek" ? Eye : kind === "swap" ? Repeat2 : kind === "steal" ? Users : Sparkles;
-  const iconClass = size === "sm" ? "h-2.5 w-2.5" : "h-3 w-3";
-  return <Icon className={iconClass} />;
 }
 
 export function PlayingCard({ card, faceDown, size = "lg", selected, highlight, onClick, className }: Props) {
@@ -55,7 +48,6 @@ export function PlayingCard({ card, faceDown, size = "lg", selected, highlight, 
   };
 
   const Tag = onClick ? motion.button : motion.div;
-  const isBlackKing = card?.value === "K" && (card?.suit === "♠" || card?.suit === "♣");
 
   return (
     <Tag
@@ -127,30 +119,17 @@ export function PlayingCard({ card, faceDown, size = "lg", selected, highlight, 
               <span className="text-xs sm:text-sm">{card?.suit}</span>
             </div>
 
-            {/* Center suit and special power badge */}
-            <div className="flex flex-col items-center justify-center my-auto">
+            {/* Center suit */}
+            <div className="grid place-items-center font-bold leading-none my-auto">
               <div
                 className={cn(
-                  "font-bold leading-none",
-                  size === "sm" ? "text-base" : size === "md" ? "text-xl" : size === "lg" ? "text-3xl" : "text-4xl",
+                  "font-bold leading-none select-none",
+                  size === "sm" ? "text-lg" : size === "md" ? "text-2xl" : size === "lg" ? "text-4xl" : "text-5xl",
                   suitColor(card?.suit ?? "")
                 )}
               >
                 {card?.suit}
               </div>
-
-              {card?.special && size !== "sm" && (
-                <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-cyan-500/20 border border-cyan-400/40 px-1.5 py-0.5 text-[8px] font-black text-cyan-300 uppercase tracking-wider whitespace-nowrap shadow-sm">
-                  <SpecialIcon kind={card.special} size={size} />
-                  {card.special === "swap" ? "Trocar" : card.special === "peek" ? "Espiar" : card.special}
-                </span>
-              )}
-
-              {isBlackKing && size !== "sm" && (
-                <span className="mt-1 inline-flex items-center gap-0.5 rounded-full bg-emerald-500/20 border border-emerald-400/40 px-1.5 py-0.5 text-[8px] font-black text-emerald-300 whitespace-nowrap shadow-sm">
-                  0 pts ⭐
-                </span>
-              )}
             </div>
 
             {/* Bottom row: points on left, inverted value on right */}

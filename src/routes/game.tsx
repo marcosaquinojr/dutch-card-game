@@ -743,13 +743,6 @@ function Game() {
             )}
           </AnimatePresence>
 
-          {/* Dica rápida de Snap */}
-          {gameState.discardTop && !isMeLocked && !drawnCard && !jackMode && (
-            <div className="mt-2 text-[11px] font-bold text-yellow-300/80 flex items-center gap-1 bg-yellow-500/10 px-3 py-1 rounded-full border border-yellow-500/20 backdrop-blur-md">
-              <Zap className="h-3 w-3 fill-current" />
-              Sabe que tem carta igual a {gameState.discardTop.value}? Clique no raio ⚡ para Snap!
-            </div>
-          )}
         </div>
 
         {/* Sua Área: Cartas dispostas lado a lado na horizontal */}
@@ -798,7 +791,7 @@ function Game() {
         </div>
 
         {/* Histórico Pequeno no Canto Inferior Esquerdo (sem revelar valor das cartas) */}
-        <div className="absolute bottom-2 left-2 sm:bottom-3 sm:left-3 z-20 pointer-events-auto max-w-[210px] sm:max-w-[280px]">
+        <div className="absolute bottom-2 left-2 sm:bottom-3 sm:left-3 z-20 pointer-events-auto max-w-[200px] sm:max-w-[250px] origin-bottom-left scale-90 sm:scale-100 hidden sm:block">
           <div className="rounded-2xl glass-strong border border-white/10 bg-black/65 backdrop-blur-xl shadow-2xl p-2.5 text-xs transition-all">
             <div className="flex items-center justify-between gap-1.5 pb-1.5 mb-1.5 border-b border-white/10">
               <span className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-white/70">
