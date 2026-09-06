@@ -90,18 +90,24 @@ function Game() {
   const [mutedState, setMutedState] = useState(isSfxMuted());
   const [screenShake, setScreenShake] = useState(false);
 
-  // Notificação e destaque visual de troca de cartas (sem modal)
-  const [activeSwapNotice, setActiveSwapNotice] = useState<{
-    type: "drawn-swap" | "jack-swap";
-    description: string;
-  } | null>(null);
-  const [activeSwapHighlight, setActiveSwapHighlight] = useState<{
-    playerId?: string;
-    handIndex?: number;
-    player2Id?: string;
-    cardIndex2?: number;
-    tag?: string;
-  } | null>(null);
+  // Mini-histórico de jogadas no canto inferior esquerdo (sem revelar valores das cartas)
+  const [historyLogs, setHistoryLogs] = useState<
+    Array<{
+      id: string;
+      time: string;
+      text: string;
+      isImportant?: boolean;
+      icon?: string;
+    }>
+  >([]);
+
+  const addHistoryLog = (text: string, isImportant = false, icon?: string) => {
+    const time = new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+    setHistoryLogs((prev) => [
+      { id: Math.random().toString(), time, text, isImportant, icon },
+      ...prev.slice(0, 14),
+    ]);
+  };
 
   const persistentPlayerId = typeof window !== "undefined" ? localStorage.getItem("dutch_playerId") : null;
   const playerName = (typeof window !== "undefined" ? localStorage.getItem("dutch_playerName") : null) || "Você";
@@ -149,6 +155,7 @@ function Game() {
   useEffect(() => {
     if (gameState?.phase === "memorize") {
       playCardFlip();
+      addHistoryLog("Rodada iniciada: memorize 2 cartas da sua mão!", false, "🏁");
     }
   }, [gameState?.phase]);
 
@@ -176,16 +183,18 @@ function Game() {
     if (matchResult) {
       if (matchResult.success) {
         playMatchSuccess();
+        addHistoryLog(`${matchResult.playerName} acertou Snap e descartou!`, matchResult.playerId === me?.id, "⚡");
         toast.success(matchResult.message, { icon: "⚡", duration: 4000 });
       } else {
         playMatchFail();
         setScreenShake(true);
         const t = setTimeout(() => setScreenShake(false), 400);
+        addHistoryLog(`${matchResult.playerName} errou o Snap (+1 penalidade)`, matchResult.playerId === me?.id, "❌");
         toast.error(matchResult.message, { icon: "❌", duration: 4000 });
         return () => clearTimeout(t);
       }
     }
-  }, [matchResult]);
+  }, [matchResult, me?.id]);
 
   // Alerta sonoro, tremor de mesa (Screen Shake) e notificação dramática quando alguém chama DUTCH
   useEffect(() => {
@@ -193,53 +202,46 @@ function Game() {
       playDutchCall();
       setScreenShake(true);
       const timer = setTimeout(() => setScreenShake(false), 650);
+      addHistoryLog(`🚩 ${dutchAlert.playerName} chamou DUTCH!`, dutchAlert.playerId === me?.id, "🚩");
       toast.warning(`🚩 ${dutchAlert.playerName} BATEU NA MESA E CHAMOU DUTCH! Última rodada!`, {
         duration: 8000,
         icon: "🚨",
       });
       return () => clearTimeout(timer);
     }
-  }, [dutchAlert]);
+  }, [dutchAlert, me?.id]);
 
   // Alerta e destaque visual quando qualquer participante troca uma carta (sem modal)
   useEffect(() => {
     if (swapEvent) {
       playCardPlace();
-      setActiveSwapNotice({
-        type: swapEvent.type,
-        description: swapEvent.description,
-      });
-
       if (swapEvent.type === "drawn-swap") {
-        // Apenas destaca no tabuleiro se foi outro jogador/bot quem trocou
-        if (swapEvent.playerId !== me?.id) {
-          setActiveSwapHighlight({
-            playerId: swapEvent.playerId,
-            handIndex: swapEvent.handIndex,
-            tag: `Pegou ${swapEvent.drawnCard?.value || ""}${swapEvent.drawnCard?.suit || ""}`,
-          });
-          toast.info(swapEvent.description, { icon: "🔄", duration: 4500 });
+        if (swapEvent.playerId === me?.id) {
+          addHistoryLog(`Você substituiu a sua Carta #${swapEvent.handIndex + 1}`, true, "🔄");
+        } else {
+          addHistoryLog(`${swapEvent.playerName} substituiu a Carta #${swapEvent.handIndex + 1} dele`, false, "🔄");
+          toast.info(`${swapEvent.playerName} comprou do monte e substituiu uma carta da mão`, { icon: "🔄", duration: 3500 });
         }
       } else if (swapEvent.type === "jack-swap") {
-        // Valete: destaca quais cartas foram trocadas entre os participantes
-        setActiveSwapHighlight({
-          playerId: swapEvent.player1Id,
-          handIndex: swapEvent.cardIndex1,
-          player2Id: swapEvent.player2Id,
-          cardIndex2: swapEvent.cardIndex2,
-          tag: "Troca Valete 🔄",
-        });
-        toast.info(swapEvent.description, { icon: "🃏", duration: 5500 });
-      }
+        const wasMeP1 = swapEvent.player1Id === me?.id;
+        const wasMeP2 = swapEvent.player2Id === me?.id;
+        const isMeActor = swapEvent.playerId === me?.id;
 
-      const t1 = setTimeout(() => setActiveSwapNotice(null), 5000);
-      const t2 = setTimeout(() => setActiveSwapHighlight(null), 4500);
-      return () => {
-        clearTimeout(t1);
-        clearTimeout(t2);
-      };
+        if (wasMeP1 || wasMeP2) {
+          if (isMeActor) {
+            addHistoryLog(`Você usou o Valete para trocar cartas na mesa`, true, "🃏");
+          } else {
+            const myCard = wasMeP1 ? swapEvent.cardIndex1 : swapEvent.cardIndex2;
+            addHistoryLog(`${swapEvent.playerName} trocou uma carta com a sua Carta #${myCard + 1}!`, true, "🃏");
+            toast.warning(`🃏 ${swapEvent.playerName} trocou uma carta com a sua Carta #${myCard + 1}!`, { duration: 5000 });
+          }
+        } else {
+          addHistoryLog(`${swapEvent.playerName} trocou cartas na mesa com o Valete`, false, "🃏");
+          toast.info(`${swapEvent.playerName} trocou cartas na mesa com o Valete`, { icon: "🃏", duration: 4000 });
+        }
+      }
     }
-  }, [swapEvent]);
+  }, [swapEvent, me?.id]);
 
   // Redirecionamentos de fim de rodada / jogo
   useEffect(() => {
@@ -302,6 +304,7 @@ function Game() {
     if (!isMyTurn) return;
     playCardDiscard();
     discardDrawnCard();
+    addHistoryLog("Você comprou do monte e descartou", true, "🗑️");
   };
 
   const handleSwapCard = (index: number) => {
@@ -338,6 +341,7 @@ function Game() {
     }
     playDutchCall();
     callDutch();
+    addHistoryLog("Você chamou DUTCH! 🚩", true, "🚩");
     toast.success("Você bateu na mesa e chamou DUTCH! 🚩");
   };
 
@@ -560,10 +564,6 @@ function Game() {
                 {Array.from({ length: p.cardsCount }).map((_, cardIdx) => {
                   const isFirstSelected = jackFirstCard?.playerId === p.id && jackFirstCard?.cardIndex === cardIdx;
                   const canSelectForJack = (jackMode === "selecting-first" || jackMode === "selecting-second") && !p.isLocked;
-                  const isSwapHighlighted =
-                    (activeSwapHighlight?.playerId === p.id && activeSwapHighlight?.handIndex === cardIdx) ||
-                    (activeSwapHighlight?.player2Id === p.id && activeSwapHighlight?.cardIndex2 === cardIdx);
-
                   return (
                     <div
                       key={cardIdx}
@@ -573,18 +573,12 @@ function Game() {
                         canSelectForJack && "cursor-pointer hover:scale-115 hover:z-20 hover:brightness-125",
                         canSelectForJack && !isFirstSelected && "ring-1 ring-yellow-400/80 shadow-[0_0_8px_rgba(250,204,21,0.5)] animate-pulse",
                         isFirstSelected && "ring-2 ring-yellow-400 scale-115 shadow-[0_0_15px_rgba(250,204,21,0.9)] z-20",
-                        isSwapHighlighted && "ring-2 ring-cyan-400 scale-110 shadow-[0_0_15px_rgba(34,211,238,0.8)] z-20 animate-pulse",
                       )}
                       title={canSelectForJack ? `Selecionar carta de ${p.name}` : undefined}
                     >
                       {isFirstSelected && (
                         <span className="absolute -top-2 -right-1 text-[8px] bg-yellow-400 text-black font-black px-1 rounded-full shadow z-30 animate-bounce">
                           1ª
-                        </span>
-                      )}
-                      {isSwapHighlighted && (
-                        <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 text-[7px] bg-cyan-500 text-black font-black px-1.5 py-0.5 rounded-full shadow-lg z-30 whitespace-nowrap animate-bounce border border-cyan-300">
-                          🔄
                         </span>
                       )}
                       <CardBack size="sm" />
@@ -792,14 +786,6 @@ function Game() {
             canMatch={!!gameState.discardTop}
             swapActive={Boolean(drawnCard || jackMode === "selecting-first" || jackMode === "selecting-second")}
             selectedIndex={jackFirstCard?.playerId === me?.id ? jackFirstCard.cardIndex : undefined}
-            swappedIndex={
-              activeSwapHighlight?.playerId === me?.id
-                ? activeSwapHighlight?.handIndex
-                : activeSwapHighlight?.player2Id === me?.id
-                  ? activeSwapHighlight?.cardIndex2
-                  : undefined
-            }
-            swappedTag={activeSwapHighlight?.tag}
             onCardClick={(index: number) => {
               if (drawnCard) {
                 handleSwapCard(index);
@@ -809,6 +795,42 @@ function Game() {
             }}
             onMatchClick={handleMatchSnap}
           />
+        </div>
+
+        {/* Histórico Pequeno no Canto Inferior Esquerdo (sem revelar valor das cartas) */}
+        <div className="absolute bottom-2 left-2 sm:bottom-3 sm:left-3 z-20 pointer-events-auto max-w-[210px] sm:max-w-[280px]">
+          <div className="rounded-2xl glass-strong border border-white/10 bg-black/65 backdrop-blur-xl shadow-2xl p-2.5 text-xs transition-all">
+            <div className="flex items-center justify-between gap-1.5 pb-1.5 mb-1.5 border-b border-white/10">
+              <span className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-white/70">
+                <span>📜</span> Histórico
+              </span>
+              <span className="text-[9px] text-white/40 font-mono">
+                {historyLogs.length > 0 ? "ao vivo" : "em espera"}
+              </span>
+            </div>
+
+            {historyLogs.length === 0 ? (
+              <p className="text-[10px] text-white/40 italic py-1">As jogadas aparecerão aqui...</p>
+            ) : (
+              <div className="space-y-1 max-h-[85px] sm:max-h-[115px] overflow-y-auto pr-1">
+                {historyLogs.slice(0, 5).map((log) => (
+                  <div
+                    key={log.id}
+                    className={cn(
+                      "flex items-start gap-1.5 rounded-lg px-2 py-1 text-[10px] sm:text-[11px] leading-tight transition-all",
+                      log.isImportant
+                        ? "bg-amber-500/20 border border-amber-400/40 text-amber-200 font-bold"
+                        : "bg-white/5 border border-white/5 text-white/75"
+                    )}
+                  >
+                    <span className="shrink-0 text-xs">{log.icon || "•"}</span>
+                    <span className="flex-1 min-w-0 break-words">{log.text}</span>
+                    <span className="text-[8px] text-white/30 shrink-0 font-mono mt-0.5">{log.time}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </motion.div>
 

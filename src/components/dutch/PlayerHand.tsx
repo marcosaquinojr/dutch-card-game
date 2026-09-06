@@ -17,8 +17,6 @@ interface Props {
   isLocked?: boolean;
   canMatch?: boolean;
   swapActive?: boolean;
-  swappedIndex?: number;
-  swappedTag?: string;
   className?: string;
 }
 
@@ -35,8 +33,6 @@ export function PlayerHand({
   isLocked = false,
   canMatch = false,
   swapActive = false,
-  swappedIndex,
-  swappedTag,
   className,
 }: Props) {
   const isGridLayout = layout === "grid" && cards.length <= 4 && !compact;
@@ -82,18 +78,12 @@ export function PlayerHand({
                 "relative group flex flex-col items-center cursor-pointer",
                 swapActive && "ring-2 ring-[color:var(--neon)] ring-offset-2 ring-offset-black/70 rounded-xl shadow-[0_0_15px_rgba(56,189,248,0.4)] animate-pulse",
                 selectedIndex === i && "ring-2 ring-yellow-400 ring-offset-2 ring-offset-black/70 rounded-xl scale-105 shadow-[0_0_20px_rgba(250,204,21,0.8)] z-20",
-                swappedIndex === i && "ring-2 ring-cyan-400 ring-offset-2 ring-offset-black/80 rounded-xl scale-105 shadow-[0_0_20px_rgba(34,211,238,0.8)] z-30 animate-pulse",
               )}
               onClick={() => {
                 if (onCardClick) onCardClick(i);
               }}
             >
-              {swappedIndex === i && (
-                <span className="absolute -top-3.5 left-1/2 -translate-x-1/2 text-[9px] bg-cyan-500 text-black font-black px-2 py-0.5 rounded-full shadow-2xl z-30 whitespace-nowrap animate-bounce border border-cyan-300">
-                  {swappedTag || "Troca Valete 🔄"}
-                </span>
-              )}
-              {selectedIndex === i && swappedIndex !== i && (
+              {selectedIndex === i && (
                 <span className="absolute -top-2.5 -right-1 text-[9px] bg-yellow-400 text-black font-extrabold px-1.5 py-0.5 rounded-full shadow-lg z-20 animate-bounce">
                   1ª Carta 📌
                 </span>

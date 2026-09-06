@@ -217,7 +217,7 @@ function checkBotTurn(io: TypedServer, room: GameRoom): void {
         const discardedCard = currentP.hand[chosenIdx];
         const { effect } = GameEngine.swapDrawnWithHand(room, currentP.id, chosenIdx);
 
-        // Notifica a mesa sobre qual carta o bot comprou e qual carta descartou
+        // Notifica a mesa sobre a troca sem vazar o valor da carta puxada (preservando o jogo de memória)
         io.to(room.code).emit('game:swap-event', {
           type: 'drawn-swap',
           playerId: currentP.id,
@@ -225,13 +225,13 @@ function checkBotTurn(io: TypedServer, room: GameRoom): void {
           handIndex: chosenIdx,
           drawnCard,
           discardedCard,
-          description: `🔄 ${currentP.name} comprou ${drawnCard.value}${drawnCard.suit} (${drawnCard.points} pts), colocou na Carta #${chosenIdx + 1} e descartou ${discardedCard.value}${discardedCard.suit}!`,
+          description: `🔄 ${currentP.name} comprou do monte e substituiu a Carta #${chosenIdx + 1}.`,
         });
 
         const swapMsg: ChatMessage = {
           id: crypto.randomUUID(),
           author: 'Sistema',
-          text: `🔄 ${currentP.name} comprou ${drawnCard.value}${drawnCard.suit}, colocou na Carta #${chosenIdx + 1} e descartou ${discardedCard.value}${discardedCard.suit}!`,
+          text: `🔄 ${currentP.name} comprou do monte e substituiu a Carta #${chosenIdx + 1}.`,
           time: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
           system: true,
         };
@@ -254,12 +254,12 @@ function checkBotTurn(io: TypedServer, room: GameRoom): void {
               player2Id: other.id,
               player2Name: other.name,
               cardIndex2: 0,
-              description: `🃏 ${currentP.name} usou o Valete para trocar a Carta #1 dele com a Carta #1 de ${other.name}!`,
+              description: `🃏 ${currentP.name} trocou a Carta #1 dele com a Carta #1 de ${other.name}!`,
             });
             const jackMsg: ChatMessage = {
               id: crypto.randomUUID(),
               author: 'Sistema',
-              text: `🃏 ${currentP.name} usou o Valete para trocar a Carta #1 dele com a Carta #1 de ${other.name}!`,
+              text: `🃏 ${currentP.name} trocou a Carta #1 dele com a Carta #1 de ${other.name}!`,
               time: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
               system: true,
             };
@@ -668,13 +668,13 @@ export function registerSocketHandlers(io: TypedServer): void {
           handIndex: data.handIndex,
           drawnCard,
           discardedCard: oldCard,
-          description: `🔄 ${player.name} comprou ${drawnCard.value}${drawnCard.suit} (${drawnCard.points} pts), colocou na Carta #${data.handIndex + 1} e descartou ${oldCard.value}${oldCard.suit}!`,
+          description: `🔄 ${player.name} comprou do monte e substituiu a Carta #${data.handIndex + 1}.`,
         });
 
         const swapMsg: ChatMessage = {
           id: crypto.randomUUID(),
           author: 'Sistema',
-          text: `🔄 ${player.name} comprou ${drawnCard.value}${drawnCard.suit}, colocou na Carta #${data.handIndex + 1} e descartou ${oldCard.value}${oldCard.suit}!`,
+          text: `🔄 ${player.name} comprou do monte e substituiu a Carta #${data.handIndex + 1}.`,
           time: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
           system: true,
         };
@@ -780,7 +780,7 @@ export function registerSocketHandlers(io: TypedServer): void {
       const p1 = room.players.find((p) => p.id === data.player1Id);
       const p2 = room.players.find((p) => p.id === data.player2Id);
 
-      const swapDescription = `🃏 ${player.name} usou o Valete para trocar a Carta #${data.cardIndex1 + 1} de ${p1?.name} com a Carta #${data.cardIndex2 + 1} de ${p2?.name}!`;
+      const swapDescription = `🃏 ${player.name} trocou a Carta #${data.cardIndex1 + 1} de ${p1?.name} com a Carta #${data.cardIndex2 + 1} de ${p2?.name}.`;
 
       io.to(room.code).emit('game:swap-event', {
         type: 'jack-swap',
